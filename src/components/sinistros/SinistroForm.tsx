@@ -4,6 +4,12 @@ import { MODULES, SECTIONS } from "@/lib/schema";
 import type { SinistroRecord } from "@/lib/dataStore";
 import { criar, atualizar } from "@/lib/dataStore";
 import { useUsuarioAtual } from "@/components/UserProvider";
+import {
+  maskCpfCnpjInput,
+  maskMoedaInput,
+  moedaParaArmazenamento,
+  moedaParaExibicao,
+} from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +26,7 @@ function FieldInput({
   onChange: (v: string) => void;
 }) {
   const listId = field.options ? `opts-${field.key}` : undefined;
+
   if (field.type === "textarea") {
     return (
       <Textarea
@@ -30,12 +37,44 @@ function FieldInput({
       />
     );
   }
+
+  // Moeda: máscara pt-BR (1.234,56); armazena valor canônico (1234.56).
+  if (field.type === "currency") {
+    return (
+      <div className="relative">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+          R$
+        </span>
+        <Input
+          id={`f-${field.key}`}
+          inputMode="numeric"
+          className="pl-8"
+          placeholder="0,00"
+          value={moedaParaExibicao(value)}
+          onChange={(e) => onChange(moedaParaArmazenamento(maskMoedaInput(e.target.value)))}
+        />
+      </div>
+    );
+  }
+
+  // CPF/CNPJ: máscara progressiva.
+  if (field.key === "cpf_cnpj") {
+    return (
+      <Input
+        id={`f-${field.key}`}
+        inputMode="numeric"
+        placeholder="000.000.000-00"
+        value={maskCpfCnpjInput(value)}
+        onChange={(e) => onChange(maskCpfCnpjInput(e.target.value))}
+      />
+    );
+  }
+
   return (
     <>
       <Input
         id={`f-${field.key}`}
-        type={field.type === "date" ? "date" : field.type === "text" ? "text" : "number"}
-        step={field.type === "currency" ? "0.01" : undefined}
+        type={field.type === "date" ? "date" : field.type === "number" ? "number" : "text"}
         list={listId}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -76,8 +115,8 @@ export function SinistroForm({
     setValues(init);
   }, [registro, fields]);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  async function salvar() {
+    if (saving) return;
     setSaving(true);
     try {
       if (registro) {
@@ -88,13 +127,21 @@ export function SinistroForm({
         toast.success("Sinistro cadastrado", { description: `Criado por ${usuario}` });
       }
       onSaved();
+    } catch (err) {
+      toast.error("Não foi possível salvar", { description: String(err) });
     } finally {
       setSaving(false);
     }
-  };
+  }
 
   return (
-    <form onSubmit={submit} className="space-y-6">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void salvar();
+      }}
+      className="space-y-6"
+    >
       {SECTIONS.map((section) => {
         const secFields = fields.filter((f) => f.section === section);
         if (!secFields.length) return null;
@@ -123,11 +170,11 @@ export function SinistroForm({
       })}
 
       <div className="sticky bottom-0 flex justify-end gap-2 border-t bg-card py-3">
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={saving}>
-          {registro ? "Salvar alterações" : "Cadastrar sinistro"}
+        <Button type="button" onClick={() => void salvar()} disabled={saving}>
+          {saving ? "Salvando…" : registro ? "Salvar alterações" : "Cadastrar sinistro"}
         </Button>
       </div>
     </form>
