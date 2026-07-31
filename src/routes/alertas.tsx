@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { listar, type SinistroRecord } from "@/lib/dataStore";
 import type { ModuleKey } from "@/lib/schema";
+import { getRegras } from "@/lib/config";
 import { formatCurrency, formatDate, toNumber } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,6 @@ export const Route = createFileRoute("/alertas")({
   component: Alertas,
 });
 
-const DIAS_PARADO = 30;
 const PAGINA = 50;
 
 interface Linha {
@@ -47,6 +47,7 @@ function diasDesde(data: string): number | null {
 function Alertas() {
   const [linhas, setLinhas] = useState<Linha[]>([]);
   const [limite, setLimite] = useState<Record<string, number>>({});
+  const diasParado = getRegras().dias_parado;
 
   useEffect(() => {
     void Promise.all([listar("casco"), listar("integral")]).then(([c, i]) => {
@@ -66,9 +67,9 @@ function Alertas() {
       linhas.filter((l) => {
         if (finalizado(String(l.rec["status_processo"] ?? ""))) return false;
         const d = diasDesde(String(l.rec["data_aviso"] ?? ""));
-        return d !== null && d > DIAS_PARADO;
+        return d !== null && d > diasParado;
       }),
-    [linhas],
+    [linhas, diasParado],
   );
   const incompletos = useMemo(
     () =>
@@ -90,8 +91,8 @@ function Alertas() {
       badge: (l: Linha) => formatCurrency(toNumber(l.rec["valor_pendente"])),
     },
     {
-      titulo: `Processos parados (> ${DIAS_PARADO} dias)`,
-      desc: "Avisados há mais de 30 dias e ainda não finalizados.",
+      titulo: `Processos parados (> ${diasParado} dias)`,
+      desc: `Avisados há mais de ${diasParado} dias e ainda não finalizados.`,
       icon: Clock,
       cor: "text-red-600",
       itens: parados,
