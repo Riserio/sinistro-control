@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { MODULES, type ModuleKey, type FieldDef } from "@/lib/schema";
 import { upsertPorProcesso, restaurarBackup, type BackupData } from "@/lib/dataStore";
@@ -28,7 +28,7 @@ export const Route = createFileRoute("/importar")({
   head: () => ({
     meta: [
       { title: "Importar Planilha | BP Seguradora" },
-      { name: "description", content: "Importe CSV/Excel com mapeamento automático de colunas e upsert por Nº Processo." },
+      { name: "description", content: "Importe CSV/Excel com seleção de aba, mapeamento automático de colunas e upsert por Nº Processo." },
       { property: "og:title", content: "Importar Planilha | BP Seguradora" },
       { property: "og:description", content: "Importação de planilha com upsert por Nº Processo." },
     ],
@@ -36,7 +36,7 @@ export const Route = createFileRoute("/importar")({
   component: Importar,
 });
 
-/** Normaliza cabeçalhos para casar apesar de acento/espaço/maiúsculas. */
+/** Normaliza cabeçalhos/nomes para casar apesar de acento/espaço/maiúsculas. */
 function norm(s: string): string {
   return s
     .normalize("NFD")
@@ -54,16 +54,22 @@ function mapaCampos(fields: FieldDef[]): Map<string, string> {
   return m;
 }
 
-interface Preview {
-  colunas: string[];
-  mapeadas: Record<string, string | null>;
-  linhas: Record<string, unknown>[];
+/** Escolhe a aba mais provável para o módulo a partir do nome da aba. */
+function abaPadrao(nomes: string[], modulo: ModuleKey): string {
+  const achar = (pred: (n: string) => boolean) => nomes.find((n) => pred(norm(n)));
+  if (modulo === "integral") {
+    return achar((n) => n.includes("integral")) ?? nomes[0]!;
+  }
+  return achar((n) => n.includes("casco") || n.includes("parcial")) ?? nomes[0]!;
 }
+
+type Sheets = Record<string, Record<string, unknown>[]>;
 
 function Importar() {
   const { usuario } = useUsuarioAtual();
   const [modulo, setModulo] = useState<ModuleKey>("casco");
-  const [preview, setPreview] = useState<Preview | null>(null);
+  const [sheets, setSheets] = useState<Sheets | null>(null);
+  const [abaSel, setAbaSel] = useState<string | null>(null);
   const [resultado, setResultado] = useState<{ criados: number; atualizados: number } | null>(
     null,
   );
@@ -76,17 +82,33 @@ function Importar() {
   async function lerArquivo(file: File) {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: "array" });
-    const ws = wb.Sheets[wb.SheetNames[0]!]!;
-    const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "", raw: false });
-    if (json.length === 0) {
-      toast.error("Arquivo vazio ou ilegível.");
+    if (wb.SheetNames.length === 0) {
+      toast.error("Arquivo sem abas legíveis.");
       return;
     }
+    const map: Sheets = {};
+    for (const name of wb.SheetNames) {
+      map[name] = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[name]!, {
+        defval: "",
+        raw: false,
+      });
+    }
+    setResultado(null);
+    setSheets(map);
+    setAbaSel(abaPadrao(wb.SheetNames, modulo));
+    toast.success(`${wb.SheetNames.length} aba(s) encontrada(s).`, {
+      description: wb.SheetNames.join(" • "),
+    });
+  }
+
+  const preview = useMemo(() => {
+    if (!sheets || !abaSel || !sheets[abaSel]) return null;
+    const json = sheets[abaSel];
+    if (json.length === 0) return { colunas: [] as string[], mapeadas: {}, linhas: [] };
     const colunas = Object.keys(json[0]!);
     const mapa = mapaCampos(fields);
     const mapeadas: Record<string, string | null> = {};
     for (const col of colunas) mapeadas[col] = mapa.get(norm(col)) ?? null;
-
     const linhas = json.map((raw) => {
       const rec: Record<string, unknown> = {};
       for (const col of colunas) {
@@ -95,15 +117,8 @@ function Importar() {
       }
       return rec;
     });
-    setResultado(null);
-    setPreview({ colunas, mapeadas, linhas });
-    const naoMapeadas = colunas.filter((c) => !mapeadas[c]).length;
-    toast.success(`${json.length} linha(s) lida(s).`, {
-      description: naoMapeadas
-        ? `${colunas.length - naoMapeadas} coluna(s) reconhecida(s), ${naoMapeadas} ignorada(s).`
-        : "Todas as colunas reconhecidas.",
-    });
-  }
+    return { colunas, mapeadas, linhas };
+  }, [sheets, abaSel, fields]);
 
   async function confirmarImportacao() {
     if (!preview) return;
@@ -135,17 +150,16 @@ function Importar() {
     }
   }
 
-  const colsMapeadas = preview
-    ? preview.colunas.filter((c) => preview.mapeadas[c])
-    : [];
+  const colsMapeadas = preview ? preview.colunas.filter((c) => preview.mapeadas[c]) : [];
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-xl font-semibold">Importar</h1>
         <p className="text-sm text-muted-foreground">
-          Envie a planilha (CSV ou Excel). O sistema faz <strong>upsert por Nº Processo</strong>:
-          se o processo já existe, atualiza (registrando no histórico); se não, cria.
+          Envie a planilha (CSV ou Excel). Se o arquivo tiver várias abas, escolha qual aba
+          importar para cada módulo. O sistema faz <strong>upsert por Nº Processo</strong>: se o
+          processo já existe, atualiza (registrando no histórico); se não, cria.
         </p>
       </div>
 
@@ -163,6 +177,25 @@ function Importar() {
               </SelectContent>
             </Select>
           </div>
+
+          {sheets && (
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Aba da planilha</label>
+              <Select value={abaSel ?? undefined} onValueChange={setAbaSel}>
+                <SelectTrigger className="w-64">
+                  <SelectValue placeholder="Escolha a aba" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.keys(sheets).map((name) => (
+                    <SelectItem key={name} value={name}>
+                      {name} ({sheets[name]!.length})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <input
             ref={fileRef}
             type="file"
@@ -180,8 +213,9 @@ function Importar() {
           </Button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Os cabeçalhos devem ser os nomes das colunas da planilha (ex.: "Nº PROCESSO", "STATUS DO
-          PROCESSO", "DATA DO AVISO"). O reconhecimento ignora acentos, espaços e maiúsculas.
+          Dica: sua planilha tem as abas <strong>INDENIZAÇÃO INTEGRAL</strong> e{" "}
+          <strong>CASCO - PERDA PARCIAL</strong>. Importe cada aba para o módulo correspondente. Os
+          cabeçalhos são reconhecidos ignorando acentos, espaços e maiúsculas.
         </p>
       </div>
 
@@ -189,12 +223,12 @@ function Importar() {
         <div className="space-y-3 rounded-lg border bg-card p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold">
-              Pré-visualização ({preview.linhas.length} linha(s))
+              Pré-visualização — aba “{abaSel}” ({preview.linhas.length} linha(s))
             </h2>
             <div className="flex items-center gap-2">
               <Badge variant="secondary">{colsMapeadas.length} coluna(s) reconhecida(s)</Badge>
               <Button size="sm" onClick={() => void confirmarImportacao()} disabled={importando}>
-                {importando ? "Importando…" : "Confirmar importação"}
+                {importando ? "Importando…" : `Importar para ${MODULES[modulo].label}`}
               </Button>
             </div>
           </div>
@@ -231,6 +265,12 @@ function Importar() {
             <p className="text-xs text-muted-foreground">
               Colunas ignoradas (sem correspondência):{" "}
               {preview.colunas.filter((c) => !preview.mapeadas[c]).join(", ")}
+            </p>
+          )}
+          {colsMapeadas.length === 0 && (
+            <p className="text-xs text-amber-700">
+              Nenhuma coluna reconhecida nesta aba — verifique se a aba selecionada corresponde ao
+              módulo de destino.
             </p>
           )}
         </div>
