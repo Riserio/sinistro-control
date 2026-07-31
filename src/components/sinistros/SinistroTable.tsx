@@ -171,8 +171,8 @@ export function SinistroTable({ modulo }: { modulo: ModuleKey }) {
       </div>
 
       <div className="rounded-lg border bg-card p-4">
-        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
-          <div className="relative lg:col-span-2">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               className="pl-8"
@@ -220,7 +220,7 @@ export function SinistroTable({ modulo }: { modulo: ModuleKey }) {
               ))}
             </SelectContent>
           </Select>
-          <div className="flex items-end gap-2">
+          <div className="flex items-end gap-2 md:col-span-2">
             <div className="flex-1">
               <Label className="mb-1 block text-[11px] text-muted-foreground">De</Label>
               <Input type="date" value={de} onChange={(e) => setDe(e.target.value)} />
@@ -388,7 +388,7 @@ export function SinistroTable({ modulo }: { modulo: ModuleKey }) {
         <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {dialog?.mode === "novo" ? "Novo sinistro" : "Editar sinistro"} — {label}
+              {dialog?.record ? "Editar sinistro" : "Novo sinistro"} — {label}
             </DialogTitle>
             <DialogDescription>
               {dialog?.record
