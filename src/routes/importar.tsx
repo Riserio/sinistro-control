@@ -1,21 +1,274 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useRef, useState } from "react";
+import * as XLSX from "xlsx";
+import { MODULES, type ModuleKey, type FieldDef } from "@/lib/schema";
+import { upsertPorProcesso, restaurarBackup, type BackupData } from "@/lib/dataStore";
+import { useUsuarioAtual } from "@/components/UserProvider";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Upload, DatabaseBackup, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/importar")({
   head: () => ({
     meta: [
       { title: "Importar Planilha | BP Seguradora" },
-      { name: "description", content: "Importe CSV/Excel com mapeamento de colunas e upsert." },
+      { name: "description", content: "Importe CSV/Excel com mapeamento automático de colunas e upsert por Nº Processo." },
       { property: "og:title", content: "Importar Planilha | BP Seguradora" },
       { property: "og:description", content: "Importação de planilha com upsert por Nº Processo." },
     ],
   }),
-  component: () => (
-    <div className="rounded-lg border bg-card p-10 text-center">
-      <h1 className="text-lg font-semibold">Importar</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Importação de CSV/Excel com mapeamento de colunas e upsert por Nº Processo na próxima
-        etapa.
-      </p>
-    </div>
-  ),
+  component: Importar,
 });
+
+/** Normaliza cabeçalhos para casar apesar de acento/espaço/maiúsculas. */
+function norm(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function mapaCampos(fields: FieldDef[]): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const f of fields) {
+    m.set(norm(f.label), f.key);
+    m.set(norm(f.key), f.key);
+  }
+  return m;
+}
+
+interface Preview {
+  colunas: string[];
+  mapeadas: Record<string, string | null>;
+  linhas: Record<string, unknown>[];
+}
+
+function Importar() {
+  const { usuario } = useUsuarioAtual();
+  const [modulo, setModulo] = useState<ModuleKey>("casco");
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [resultado, setResultado] = useState<{ criados: number; atualizados: number } | null>(
+    null,
+  );
+  const [importando, setImportando] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const backupRef = useRef<HTMLInputElement>(null);
+
+  const fields = MODULES[modulo].fields;
+
+  async function lerArquivo(file: File) {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]!]!;
+    const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "", raw: false });
+    if (json.length === 0) {
+      toast.error("Arquivo vazio ou ilegível.");
+      return;
+    }
+    const colunas = Object.keys(json[0]!);
+    const mapa = mapaCampos(fields);
+    const mapeadas: Record<string, string | null> = {};
+    for (const col of colunas) mapeadas[col] = mapa.get(norm(col)) ?? null;
+
+    const linhas = json.map((raw) => {
+      const rec: Record<string, unknown> = {};
+      for (const col of colunas) {
+        const key = mapeadas[col];
+        if (key) rec[key] = raw[col];
+      }
+      return rec;
+    });
+    setResultado(null);
+    setPreview({ colunas, mapeadas, linhas });
+    const naoMapeadas = colunas.filter((c) => !mapeadas[c]).length;
+    toast.success(`${json.length} linha(s) lida(s).`, {
+      description: naoMapeadas
+        ? `${colunas.length - naoMapeadas} coluna(s) reconhecida(s), ${naoMapeadas} ignorada(s).`
+        : "Todas as colunas reconhecidas.",
+    });
+  }
+
+  async function confirmarImportacao() {
+    if (!preview) return;
+    setImportando(true);
+    try {
+      const validas = preview.linhas.filter((l) =>
+        Object.values(l).some((v) => String(v ?? "").trim() !== ""),
+      );
+      const r = await upsertPorProcesso(modulo, validas, usuario);
+      setResultado(r);
+      toast.success("Importação concluída.", {
+        description: `${r.criados} criado(s), ${r.atualizados} atualizado(s).`,
+      });
+    } finally {
+      setImportando(false);
+    }
+  }
+
+  async function restaurar(file: File) {
+    try {
+      const texto = await file.text();
+      const data = JSON.parse(texto) as Partial<BackupData>;
+      const r = restaurarBackup(data);
+      toast.success("Backup restaurado.", {
+        description: `Casco: ${r.casco} • Integral: ${r.integral}. Recarregue as telas.`,
+      });
+    } catch {
+      toast.error("Backup inválido. Selecione um arquivo .json gerado pelo botão Backup.");
+    }
+  }
+
+  const colsMapeadas = preview
+    ? preview.colunas.filter((c) => preview.mapeadas[c])
+    : [];
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-xl font-semibold">Importar</h1>
+        <p className="text-sm text-muted-foreground">
+          Envie a planilha (CSV ou Excel). O sistema faz <strong>upsert por Nº Processo</strong>:
+          se o processo já existe, atualiza (registrando no histórico); se não, cria.
+        </p>
+      </div>
+
+      <div className="rounded-lg border bg-card p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Módulo de destino</label>
+            <Select value={modulo} onValueChange={(v) => setModulo(v as ModuleKey)}>
+              <SelectTrigger className="w-56">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="casco">Casco - Perda Parcial</SelectItem>
+                <SelectItem value="integral">Indenização Integral</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void lerArquivo(f);
+              e.target.value = "";
+            }}
+          />
+          <Button onClick={() => fileRef.current?.click()} className="gap-2">
+            <Upload className="h-4 w-4" />
+            Selecionar arquivo
+          </Button>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Os cabeçalhos devem ser os nomes das colunas da planilha (ex.: "Nº PROCESSO", "STATUS DO
+          PROCESSO", "DATA DO AVISO"). O reconhecimento ignora acentos, espaços e maiúsculas.
+        </p>
+      </div>
+
+      {preview && (
+        <div className="space-y-3 rounded-lg border bg-card p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold">
+              Pré-visualização ({preview.linhas.length} linha(s))
+            </h2>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">{colsMapeadas.length} coluna(s) reconhecida(s)</Badge>
+              <Button size="sm" onClick={() => void confirmarImportacao()} disabled={importando}>
+                {importando ? "Importando…" : "Confirmar importação"}
+              </Button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {colsMapeadas.map((c) => (
+                    <TableHead key={c} className="whitespace-nowrap">
+                      {fields.find((f) => f.key === preview.mapeadas[c])?.label ?? c}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {preview.linhas.slice(0, 5).map((linha, i) => (
+                  <TableRow key={i}>
+                    {colsMapeadas.map((c) => {
+                      const key = preview.mapeadas[c]!;
+                      return (
+                        <TableCell key={c} className="whitespace-nowrap text-xs">
+                          {String(linha[key] ?? "")}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {preview.colunas.some((c) => !preview.mapeadas[c]) && (
+            <p className="text-xs text-muted-foreground">
+              Colunas ignoradas (sem correspondência):{" "}
+              {preview.colunas.filter((c) => !preview.mapeadas[c]).join(", ")}
+            </p>
+          )}
+        </div>
+      )}
+
+      {resultado && (
+        <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+          <CheckCircle2 className="h-5 w-5" />
+          Importação concluída: <strong>{resultado.criados}</strong> criado(s),{" "}
+          <strong>{resultado.atualizados}</strong> atualizado(s).
+        </div>
+      )}
+
+      <div className="rounded-lg border bg-card p-4">
+        <div className="flex items-center gap-2">
+          <DatabaseBackup className="h-4 w-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold">Restaurar backup</h2>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Selecione um arquivo <strong>.json</strong> gerado pelo botão <strong>Backup</strong> (no
+          topo) para restaurar todos os dados e o histórico.
+        </p>
+        <input
+          ref={backupRef}
+          type="file"
+          accept=".json,application/json"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void restaurar(f);
+            e.target.value = "";
+          }}
+        />
+        <Button variant="outline" size="sm" className="mt-3 gap-2" onClick={() => backupRef.current?.click()}>
+          <Upload className="h-4 w-4" />
+          Selecionar backup (.json)
+        </Button>
+      </div>
+    </div>
+  );
+}
