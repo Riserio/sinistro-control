@@ -213,3 +213,38 @@ export async function upsertPorProcesso(
   }
   return { criados, atualizados };
 }
+
+/* -------------------------------- Backup ---------------------------------- */
+
+export interface BackupData {
+  versao: number;
+  exportado_em: string;
+  casco: SinistroRecord[];
+  integral: SinistroRecord[];
+  audit: AuditEntry[];
+}
+
+/** Snapshot completo de todos os dados (ambos os módulos + histórico). */
+export function exportarBackup(): BackupData {
+  return {
+    versao: 1,
+    exportado_em: new Date().toISOString(),
+    casco: read<SinistroRecord>(KEY("casco")),
+    integral: read<SinistroRecord>(KEY("integral")),
+    audit: read<AuditEntry>(AUDIT_KEY),
+  };
+}
+
+/** Restaura os dados a partir de um backup JSON. Substitui o conteúdo atual. */
+export function restaurarBackup(data: Partial<BackupData>): {
+  casco: number;
+  integral: number;
+} {
+  if (Array.isArray(data.casco)) write(KEY("casco"), data.casco);
+  if (Array.isArray(data.integral)) write(KEY("integral"), data.integral);
+  if (Array.isArray(data.audit)) write(AUDIT_KEY, data.audit);
+  return {
+    casco: data.casco?.length ?? 0,
+    integral: data.integral?.length ?? 0,
+  };
+}
