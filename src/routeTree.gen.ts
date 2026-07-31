@@ -10,33 +10,91 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AlertasRouteImport } from './routes/alertas'
+import { Route as CascoRouteImport } from './routes/casco'
+import { Route as EsteiraRouteImport } from './routes/esteira'
+import { Route as ImportarRouteImport } from './routes/importar'
+import { Route as IntegralRouteImport } from './routes/integral'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AlertasRoute = AlertasRouteImport.update({
+  id: '/alertas',
+  path: '/alertas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CascoRoute = CascoRouteImport.update({
+  id: '/casco',
+  path: '/casco',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EsteiraRoute = EsteiraRouteImport.update({
+  id: '/esteira',
+  path: '/esteira',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImportarRoute = ImportarRouteImport.update({
+  id: '/importar',
+  path: '/importar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IntegralRoute = IntegralRouteImport.update({
+  id: '/integral',
+  path: '/integral',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/alertas': typeof AlertasRoute
+  '/casco': typeof CascoRoute
+  '/esteira': typeof EsteiraRoute
+  '/importar': typeof ImportarRoute
+  '/integral': typeof IntegralRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/alertas': typeof AlertasRoute
+  '/casco': typeof CascoRoute
+  '/esteira': typeof EsteiraRoute
+  '/importar': typeof ImportarRoute
+  '/integral': typeof IntegralRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/alertas': typeof AlertasRoute
+  '/casco': typeof CascoRoute
+  '/esteira': typeof EsteiraRoute
+  '/importar': typeof ImportarRoute
+  '/integral': typeof IntegralRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    '/' | '/alertas' | '/casco' | '/esteira' | '/importar' | '/integral'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/alertas' | '/casco' | '/esteira' | '/importar' | '/integral'
+  id:
+    | '__root__'
+    | '/'
+    | '/alertas'
+    | '/casco'
+    | '/esteira'
+    | '/importar'
+    | '/integral'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AlertasRoute: typeof AlertasRoute
+  CascoRoute: typeof CascoRoute
+  EsteiraRoute: typeof EsteiraRoute
+  ImportarRoute: typeof ImportarRoute
+  IntegralRoute: typeof IntegralRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,22 +106,52 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/alertas': {
+      id: '/alertas'
+      path: '/alertas'
+      fullPath: '/alertas'
+      preLoaderRoute: typeof AlertasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/casco': {
+      id: '/casco'
+      path: '/casco'
+      fullPath: '/casco'
+      preLoaderRoute: typeof CascoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/esteira': {
+      id: '/esteira'
+      path: '/esteira'
+      fullPath: '/esteira'
+      preLoaderRoute: typeof EsteiraRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/importar': {
+      id: '/importar'
+      path: '/importar'
+      fullPath: '/importar'
+      preLoaderRoute: typeof ImportarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/integral': {
+      id: '/integral'
+      path: '/integral'
+      fullPath: '/integral'
+      preLoaderRoute: typeof IntegralRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AlertasRoute: AlertasRoute,
+  CascoRoute: CascoRoute,
+  EsteiraRoute: EsteiraRoute,
+  ImportarRoute: ImportarRoute,
+  IntegralRoute: IntegralRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

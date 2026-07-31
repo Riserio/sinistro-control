@@ -1,24 +1,78 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { listar, type SinistroRecord } from "@/lib/dataStore";
+import { toNumber, formatCurrency } from "@/lib/format";
+import { Button } from "@/components/ui/button";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
-  component: Index,
+  head: () => ({
+    meta: [
+      { title: "Dashboard de Sinistros | BP Seguradora" },
+      {
+        name: "description",
+        content:
+          "Visão consolidada dos sinistros de automóveis da BP Seguradora: totais, valores pagos e pendentes.",
+      },
+      { property: "og:title", content: "Dashboard de Sinistros | BP Seguradora" },
+      {
+        property: "og:description",
+        content: "Indicadores consolidados de sinistros de automóveis.",
+      },
+    ],
+  }),
+  component: Dashboard,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+function Dashboard() {
+  const [casco, setCasco] = useState<SinistroRecord[]>([]);
+  const [integral, setIntegral] = useState<SinistroRecord[]>([]);
+
+  useEffect(() => {
+    void listar("casco").then(setCasco);
+    void listar("integral").then(setIntegral);
+  }, []);
+
+  const todos = [...casco, ...integral];
+  const pago = todos.reduce(
+    (s, r) => s + toNumber(r["valor_total_pago_processo"] ?? r["valor_total_pago_negado"]),
+    0,
+  );
+  const pendente = todos.reduce((s, r) => s + toNumber(r["valor_pendente"]), 0);
+
+  const cards = [
+    { label: "Total de sinistros", valor: String(todos.length) },
+    { label: "Casco - Perda Parcial", valor: String(casco.length) },
+    { label: "Indenização Integral", valor: String(integral.length) },
+    { label: "Total pago", valor: formatCurrency(pago) },
+    { label: "Total pendente", valor: formatCurrency(pendente) },
+  ];
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold">Dashboard</h1>
+        <p className="text-sm text-muted-foreground">Visão consolidada dos módulos.</p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {cards.map((c) => (
+          <div key={c.label} className="rounded-lg border bg-card p-4">
+            <p className="text-xs text-muted-foreground">{c.label}</p>
+            <p className="mt-1 text-xl font-semibold">{c.valor}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-lg border bg-card p-6">
+        <h2 className="text-sm font-semibold">Próximos passos</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Gráficos por status, contratante, cobertura e evolução mensal virão na próxima etapa.
+          Comece cadastrando sinistros no módulo Casco.
+        </p>
+        <Button asChild className="mt-4" size="sm">
+          <Link to="/casco">Ir para Casco - Perda Parcial</Link>
+        </Button>
+      </div>
     </div>
   );
 }
