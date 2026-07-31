@@ -1,20 +1,182 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { listar, type SinistroRecord } from "@/lib/dataStore";
+import type { ModuleKey } from "@/lib/schema";
+import { formatCurrency, formatDate, toNumber } from "@/lib/format";
+import { Badge } from "@/components/ui/badge";
+import { AlertTriangle, Clock, FileWarning } from "lucide-react";
 
 export const Route = createFileRoute("/alertas")({
   head: () => ({
     meta: [
       { title: "Alertas e Pendências | BP Seguradora" },
-      { name: "description", content: "Sinistros com valores pendentes e prazos em atraso." },
+      { name: "description", content: "Sinistros com valores pendentes, processos parados e dados incompletos." },
       { property: "og:title", content: "Alertas e Pendências | BP Seguradora" },
       { property: "og:description", content: "Sinistros com valores pendentes e prazos." },
     ],
   }),
-  component: () => (
-    <div className="rounded-lg border bg-card p-10 text-center">
-      <h1 className="text-lg font-semibold">Alertas</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Painel de pendências (valor pendente &gt; 0, processos parados, prazos) na próxima etapa.
-      </p>
-    </div>
-  ),
+  component: Alertas,
 });
+
+const DIAS_PARADO = 30;
+
+interface Linha {
+  modulo: ModuleKey;
+  rec: SinistroRecord;
+}
+
+const finalizado = (s: string) => {
+  const u = (s ?? "").toUpperCase();
+  return (
+    u.includes("FINALIZADO") ||
+    u.includes("PAGO") ||
+    u.includes("NEGADO") ||
+    u.includes("CANCELADO")
+  );
+};
+
+function diasDesde(data: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(data ?? "");
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Math.floor((Date.now() - d.getTime()) / 86_400_000);
+}
+
+function Alertas() {
+  const [linhas, setLinhas] = useState<Linha[]>([]);
+
+  useEffect(() => {
+    void Promise.all([listar("casco"), listar("integral")]).then(([c, i]) => {
+      setLinhas([
+        ...c.map((rec) => ({ modulo: "casco" as ModuleKey, rec })),
+        ...i.map((rec) => ({ modulo: "integral" as ModuleKey, rec })),
+      ]);
+    });
+  }, []);
+
+  const pendentes = useMemo(
+    () => linhas.filter((l) => toNumber(l.rec["valor_pendente"]) > 0),
+    [linhas],
+  );
+  const parados = useMemo(
+    () =>
+      linhas.filter((l) => {
+        if (finalizado(String(l.rec["status_processo"] ?? ""))) return false;
+        const d = diasDesde(String(l.rec["data_aviso"] ?? ""));
+        return d !== null && d > DIAS_PARADO;
+      }),
+    [linhas],
+  );
+  const incompletos = useMemo(
+    () =>
+      linhas.filter(
+        (l) =>
+          !String(l.rec["numero_processo"] ?? "").trim() ||
+          !String(l.rec["nome_segurado"] ?? "").trim(),
+      ),
+    [linhas],
+  );
+
+  const grupos = [
+    {
+      titulo: "Valores pendentes",
+      desc: "Sinistros com Valor Pendente maior que zero.",
+      icon: AlertTriangle,
+      cor: "text-amber-600",
+      itens: pendentes,
+      badge: (l: Linha) => formatCurrency(toNumber(l.rec["valor_pendente"])),
+    },
+    {
+      titulo: `Processos parados (> ${DIAS_PARADO} dias)`,
+      desc: "Avisados há mais de 30 dias e ainda não finalizados.",
+      icon: Clock,
+      cor: "text-red-600",
+      itens: parados,
+      badge: (l: Linha) => {
+        const d = diasDesde(String(l.rec["data_aviso"] ?? ""));
+        return d ? `${d} dias` : "—";
+      },
+    },
+    {
+      titulo: "Dados incompletos",
+      desc: "Sem Nº Processo ou sem Nome do Segurado.",
+      icon: FileWarning,
+      cor: "text-violet-600",
+      itens: incompletos,
+      badge: () => "revisar",
+    },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-xl font-semibold">Alertas e Pendências</h1>
+        <p className="text-sm text-muted-foreground">
+          Pontos que precisam de atenção nos dois módulos.
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        {grupos.map((g) => (
+          <div key={g.titulo} className="rounded-lg border bg-card p-4">
+            <div className="flex items-center gap-2">
+              <g.icon className={`h-4 w-4 ${g.cor}`} />
+              <p className="text-xs text-muted-foreground">{g.titulo}</p>
+            </div>
+            <p className="mt-1 text-2xl font-semibold">{g.itens.length}</p>
+          </div>
+        ))}
+      </div>
+
+      {grupos.map((g) => (
+        <div key={g.titulo} className="rounded-lg border bg-card">
+          <div className="flex items-center gap-2 border-b px-4 py-3">
+            <g.icon className={`h-4 w-4 ${g.cor}`} />
+            <div>
+              <h2 className="text-sm font-semibold">{g.titulo}</h2>
+              <p className="text-xs text-muted-foreground">{g.desc}</p>
+            </div>
+            <Badge variant="secondary" className="ml-auto">
+              {g.itens.length}
+            </Badge>
+          </div>
+          {g.itens.length === 0 ? (
+            <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+              Nenhuma pendência nesta categoria.
+            </p>
+          ) : (
+            <div className="divide-y">
+              {g.itens.slice(0, 50).map((l) => (
+                <div
+                  key={`${l.modulo}:${l.rec.id}`}
+                  className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 text-sm"
+                >
+                  <Badge variant="outline" className="text-[10px]">
+                    {l.modulo === "casco" ? "Casco" : "Integral"}
+                  </Badge>
+                  <span className="font-medium">
+                    {l.rec["numero_processo"] || "s/ processo"}
+                  </span>
+                  <span className="text-muted-foreground">{l.rec["nome_segurado"] || "—"}</span>
+                  <span className="text-muted-foreground">{l.rec["contratante"] || ""}</span>
+                  <span className="text-muted-foreground">
+                    Aviso: {formatDate(l.rec["data_aviso"]) || "—"}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {l.rec["status_processo"] || "—"}
+                  </span>
+                  <Badge className="ml-auto">{g.badge(l)}</Badge>
+                </div>
+              ))}
+              {g.itens.length > 50 && (
+                <p className="px-4 py-2 text-center text-xs text-muted-foreground">
+                  Mostrando 50 de {g.itens.length}.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
