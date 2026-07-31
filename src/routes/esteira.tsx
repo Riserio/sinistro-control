@@ -5,6 +5,7 @@ import type { ModuleKey } from "@/lib/schema";
 import { useUsuarioAtual } from "@/components/UserProvider";
 import { formatCurrency, toNumber } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -35,7 +36,8 @@ const ETAPAS = [
 ] as const;
 type Etapa = (typeof ETAPAS)[number];
 
-/** Status canônico gravado quando o card é movido para a etapa. */
+const PAGINA = 10;
+
 const STATUS_DA_ETAPA: Record<Etapa, string> = {
   Avisado: "AVISADO",
   Registrado: "REGISTRADO",
@@ -53,7 +55,8 @@ function etapaDoStatus(status: string, temRegistro: boolean): Etapa {
     s.includes("CANCELADO")
   )
     return "Finalizado";
-  if (s.includes("PROCESSO DE PAGAMENTO") || s.includes("EM PROCESSO")) return "Em Processo de Pagamento";
+  if (s.includes("PROCESSO DE PAGAMENTO") || s.includes("EM PROCESSO"))
+    return "Em Processo de Pagamento";
   if (s.includes("ANÁLISE") || s.includes("ANALISE")) return "Em Análise";
   if (s.includes("REGISTRADO") || temRegistro) return "Registrado";
   return "Avisado";
@@ -79,6 +82,7 @@ function Esteira() {
   const [integral, setIntegral] = useState<SinistroRecord[]>([]);
   const [filtro, setFiltro] = useState<"todos" | ModuleKey>("todos");
   const [arrastando, setArrastando] = useState<string | null>(null);
+  const [limite, setLimite] = useState<Record<string, number>>({});
 
   const recarregar = () => {
     void listar("casco").then(setCasco);
@@ -103,16 +107,13 @@ function Esteira() {
     return base;
   }, [filtro, casco, integral]);
 
+  const lim = (etapa: Etapa) => limite[etapa] ?? PAGINA;
+
   async function mover(modulo: ModuleKey, rec: SinistroRecord, destino: Etapa) {
     const temRegistro = Boolean(rec["data_registro"] ?? rec["data_registro_reabertura"]);
     const atual = etapaDoStatus(String(rec["status_processo"] ?? ""), temRegistro);
     if (atual === destino) return;
-    await atualizar(
-      modulo,
-      rec.id,
-      { ...rec, status_processo: STATUS_DA_ETAPA[destino] },
-      usuario,
-    );
+    await atualizar(modulo, rec.id, { ...rec, status_processo: STATUS_DA_ETAPA[destino] }, usuario);
     toast.success(`Movido para "${destino}"`, {
       description: `${rec["numero_processo"] || "Sinistro"} • registrado no histórico por ${usuario}.`,
     });
@@ -127,7 +128,8 @@ function Esteira() {
         <div>
           <h1 className="text-xl font-semibold">Esteira do Sinistro</h1>
           <p className="text-sm text-muted-foreground">
-            Arraste um card entre as etapas para atualizar o status (gravado no histórico).
+            Arraste um card entre as etapas para atualizar o status (gravado no histórico). Cada
+            coluna mostra 10 por vez.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -138,8 +140,8 @@ function Esteira() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="casco">Casco - Perda Parcial</SelectItem>
               <SelectItem value="integral">Indenização Integral</SelectItem>
+              <SelectItem value="casco">Casco - Perda Parcial</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -148,6 +150,7 @@ function Esteira() {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {ETAPAS.map((etapa) => {
           const doGrupo = cards.filter((c) => c.etapa === etapa);
+          const visiveis = doGrupo.slice(0, lim(etapa));
           return (
             <div
               key={etapa}
@@ -167,7 +170,7 @@ function Esteira() {
                 <Badge variant="secondary">{doGrupo.length}</Badge>
               </div>
               <div className="flex flex-1 flex-col gap-2 p-2">
-                {doGrupo.map((c) => (
+                {visiveis.map((c) => (
                   <div
                     key={chaveCard(c)}
                     draggable
@@ -205,10 +208,24 @@ function Esteira() {
                     </div>
                   </div>
                 ))}
+
                 {doGrupo.length === 0 && (
                   <div className="rounded-md border border-dashed p-4 text-center text-[11px] text-muted-foreground">
                     Solte aqui
                   </div>
+                )}
+
+                {doGrupo.length > visiveis.length && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-1 h-7 text-xs"
+                    onClick={() =>
+                      setLimite((p) => ({ ...p, [etapa]: (p[etapa] ?? PAGINA) + PAGINA }))
+                    }
+                  >
+                    Carregar mais ({doGrupo.length - visiveis.length})
+                  </Button>
                 )}
               </div>
             </div>
