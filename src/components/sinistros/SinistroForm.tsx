@@ -21,11 +21,19 @@ function FieldInput({
 }) {
   const listId = field.options ? `opts-${field.key}` : undefined;
   if (field.type === "textarea") {
-    return <Textarea rows={2} value={value} onChange={(e) => onChange(e.target.value)} />;
+    return (
+      <Textarea
+        id={`f-${field.key}`}
+        rows={2}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
   }
   return (
     <>
       <Input
+        id={`f-${field.key}`}
         type={field.type === "date" ? "date" : field.type === "text" ? "text" : "number"}
         step={field.type === "currency" ? "0.01" : undefined}
         list={listId}
@@ -99,7 +107,9 @@ export function SinistroForm({
                   key={f.key}
                   className={f.type === "textarea" ? "sm:col-span-2 lg:col-span-3" : ""}
                 >
-                  <Label className="mb-1.5 block text-xs text-muted-foreground">{f.label}</Label>
+                  <Label htmlFor={`f-${f.key}`} className="mb-1.5 block text-xs text-muted-foreground">
+                    {f.label}
+                  </Label>
                   <FieldInput
                     field={f}
                     value={values[f.key] ?? ""}
