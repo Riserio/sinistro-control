@@ -3,13 +3,14 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { FieldDef } from "./schema";
 import type { SinistroRecord } from "./dataStore";
-import { formatCurrency, formatDate } from "./format";
+import { formatCurrency, formatDate, formatCpfCnpj } from "./format";
 
 export function cellValue(record: SinistroRecord, field: FieldDef): string {
   const raw = record[field.key];
   if (raw === null || raw === undefined || raw === "") return "";
   if (field.type === "currency") return formatCurrency(raw);
   if (field.type === "date") return formatDate(raw);
+  if (field.key === "cpf_cnpj") return formatCpfCnpj(raw);
   return String(raw);
 }
 
