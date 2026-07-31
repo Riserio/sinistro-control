@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link, Outlet } from "@tanstack/react-router";
 import {
   LayoutDashboard,
@@ -7,9 +8,14 @@ import {
   BellRing,
   Upload,
   Info,
+  Download,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useUsuarioAtual } from "./UserProvider";
-import { USUARIOS } from "@/lib/format";
+import { USUARIOS, toNumber } from "@/lib/format";
+import { listar, exportarBackup } from "@/lib/dataStore";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -27,8 +33,56 @@ const NAV = [
   { to: "/importar", label: "Importar", icon: Upload },
 ] as const;
 
+const finalizado = (s: string) => {
+  const u = (s ?? "").toUpperCase();
+  return (
+    u.includes("FINALIZADO") ||
+    u.includes("PAGO") ||
+    u.includes("NEGADO") ||
+    u.includes("CANCELADO")
+  );
+};
+
+function diasDesde(data: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(data ?? "");
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Math.floor((Date.now() - d.getTime()) / 86_400_000);
+}
+
 export function AppLayout() {
   const { usuario, setUsuario } = useUsuarioAtual();
+  const [alertas, setAlertas] = useState(0);
+
+  useEffect(() => {
+    void Promise.all([listar("casco"), listar("integral")]).then(([c, i]) => {
+      const todos = [...c, ...i];
+      const atencao = todos.filter((r) => {
+        const pendente = toNumber(r["valor_pendente"]) > 0;
+        const dias = diasDesde(String(r["data_aviso"] ?? ""));
+        const parado = !finalizado(String(r["status_processo"] ?? "")) && dias !== null && dias > 30;
+        const incompleto =
+          !String(r["numero_processo"] ?? "").trim() ||
+          !String(r["nome_segurado"] ?? "").trim();
+        return pendente || parado || incompleto;
+      });
+      setAlertas(atencao.length);
+    });
+  }, []);
+
+  function baixarBackup() {
+    const data = exportarBackup();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `backup-sinistros-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Backup gerado.", {
+      description: `${data.casco.length + data.integral.length} sinistro(s) e histórico salvos no arquivo .json.`,
+    });
+  }
 
   return (
     <div className="flex min-h-screen bg-muted/40">
@@ -53,7 +107,12 @@ export function AppLayout() {
               className="flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors"
             >
               <Icon className="h-4 w-4" />
-              {label}
+              <span className="flex-1">{label}</span>
+              {to === "/alertas" && alertas > 0 && (
+                <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">
+                  {alertas}
+                </Badge>
+              )}
             </Link>
           ))}
         </nav>
@@ -75,9 +134,13 @@ export function AppLayout() {
             ))}
           </div>
           <div className="ml-auto flex items-center gap-3">
+            <Button variant="outline" size="sm" className="gap-2" onClick={baixarBackup}>
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Backup</span>
+            </Button>
             <span className="hidden text-xs text-muted-foreground sm:inline">Usuário atual</span>
             <Select value={usuario} onValueChange={setUsuario}>
-              <SelectTrigger className="w-56">
+              <SelectTrigger className="w-48">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
