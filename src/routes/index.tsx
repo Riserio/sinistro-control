@@ -45,16 +45,16 @@ export const Route = createFileRoute("/")({
 });
 
 const COLORS = [
-  "#2563eb",
+  "#2f52cc",
+  "#0b1b3f",
   "#16a34a",
   "#f59e0b",
   "#dc2626",
-  "#7c3aed",
   "#0891b2",
+  "#7c3aed",
   "#db2777",
   "#65a30d",
   "#ea580c",
-  "#4b5563",
 ];
 
 type Filtro = "todos" | "casco" | "integral";
@@ -87,6 +87,17 @@ function evolucaoMensal(rows: SinistroRecord[]) {
     .map(([mes, valor]) => ({ mes, valor }));
 }
 
+function Widget({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border bg-card shadow-sm">
+      <div className="border-b px-4 py-3">
+        <h2 className="text-sm font-semibold">{titulo}</h2>
+      </div>
+      <div className="p-3">{children}</div>
+    </div>
+  );
+}
+
 function Dashboard() {
   const [casco, setCasco] = useState<SinistroRecord[]>([]);
   const [integral, setIntegral] = useState<SinistroRecord[]>([]);
@@ -108,13 +119,13 @@ function Dashboard() {
 
   const porContratante = useMemo(() => contarPor(rows, "contratante"), [rows]);
   const porCobertura = useMemo(() => contarPor(rows, "cobertura").slice(0, 8), [rows]);
-  const porStatus = useMemo(() => contarPor(rows, "status_processo"), [rows]);
+  const porStatus = useMemo(() => contarPor(rows, "status_processo").slice(0, 8), [rows]);
   const evolucao = useMemo(() => evolucaoMensal(rows), [rows]);
 
   const cards = [
     { label: "Total de sinistros", valor: String(rows.length) },
-    { label: "Casco - Perda Parcial", valor: String(casco.length) },
     { label: "Indenização Integral", valor: String(integral.length) },
+    { label: "Casco - Perda Parcial", valor: String(casco.length) },
     { label: "Total pago", valor: formatCurrency(pago) },
     { label: "Total pendente", valor: formatCurrency(pendente) },
   ];
@@ -131,41 +142,42 @@ function Dashboard() {
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Visão</span>
           <Select value={filtro} onValueChange={(v) => setFiltro(v as Filtro)}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-52">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Consolidado</SelectItem>
-              <SelectItem value="casco">Casco - Perda Parcial</SelectItem>
               <SelectItem value="integral">Indenização Integral</SelectItem>
+              <SelectItem value="casco">Casco - Perda Parcial</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {cards.map((c) => (
-          <div key={c.label} className="rounded-lg border bg-card p-4">
+          <div key={c.label} className="rounded-xl border bg-card p-4 shadow-sm">
             <p className="text-xs text-muted-foreground">{c.label}</p>
-            <p className="mt-1 text-xl font-semibold">{c.valor}</p>
+            <p className="mt-1 truncate text-xl font-semibold" title={c.valor}>
+              {c.valor}
+            </p>
           </div>
         ))}
       </div>
 
       {vazio ? (
-        <div className="rounded-lg border bg-card p-10 text-center text-sm text-muted-foreground">
+        <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground shadow-sm">
           Nenhum sinistro cadastrado ainda. Importe a planilha em <strong>Importar</strong> ou
           cadastre um registro nos módulos para ver os gráficos.
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-lg border bg-card p-4">
-            <h2 className="mb-3 text-sm font-semibold">Sinistros por Contratante</h2>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={porContratante}>
+          <Widget titulo="Sinistros por Contratante">
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={porContratante} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="nome" fontSize={11} />
-                <YAxis allowDecimals={false} fontSize={11} />
+                <XAxis dataKey="nome" fontSize={11} interval={0} height={40} />
+                <YAxis allowDecimals={false} fontSize={11} width={32} />
                 <Tooltip />
                 <Bar dataKey="valor" name="Sinistros" radius={[4, 4, 0, 0]}>
                   {porContratante.map((_, i) => (
@@ -174,62 +186,62 @@ function Dashboard() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-          </div>
+          </Widget>
 
-          <div className="rounded-lg border bg-card p-4">
-            <h2 className="mb-3 text-sm font-semibold">Evolução mensal (por Data do Aviso)</h2>
-            <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={evolucao}>
+          <Widget titulo="Evolução mensal (por Data do Aviso)">
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={evolucao} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="mes" fontSize={11} />
-                <YAxis allowDecimals={false} fontSize={11} />
+                <XAxis dataKey="mes" fontSize={11} minTickGap={16} />
+                <YAxis allowDecimals={false} fontSize={11} width={32} />
                 <Tooltip />
                 <Line
                   type="monotone"
                   dataKey="valor"
                   name="Sinistros"
-                  stroke="#2563eb"
+                  stroke="#2f52cc"
                   strokeWidth={2}
                   dot={false}
                 />
               </LineChart>
             </ResponsiveContainer>
-          </div>
+          </Widget>
 
-          <div className="rounded-lg border bg-card p-4">
-            <h2 className="mb-3 text-sm font-semibold">Por Cobertura</h2>
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
+          <Widget titulo="Por Cobertura">
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart margin={{ top: 4, right: 4, left: 4, bottom: 4 }}>
                 <Pie
                   data={porCobertura}
                   dataKey="valor"
                   nameKey="nome"
                   cx="50%"
-                  cy="50%"
+                  cy="45%"
                   outerRadius={90}
-                  label={(e) => `${e.nome}: ${e.valor}`}
-                  labelLine={false}
-                  fontSize={10}
                 >
                   {porCobertura.map((_, i) => (
                     <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip />
+                <Legend
+                  layout="horizontal"
+                  verticalAlign="bottom"
+                  align="center"
+                  wrapperStyle={{ fontSize: 10 }}
+                />
               </PieChart>
             </ResponsiveContainer>
-          </div>
+          </Widget>
 
-          <div className="rounded-lg border bg-card p-4">
-            <h2 className="mb-3 text-sm font-semibold">Por Status do Processo</h2>
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
+          <Widget titulo="Por Status do Processo">
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart margin={{ top: 4, right: 4, left: 4, bottom: 4 }}>
                 <Pie
                   data={porStatus}
                   dataKey="valor"
                   nameKey="nome"
                   cx="50%"
-                  cy="50%"
+                  cy="45%"
                   outerRadius={90}
                 >
                   {porStatus.map((_, i) => (
@@ -237,10 +249,15 @@ function Dashboard() {
                   ))}
                 </Pie>
                 <Tooltip />
-                <Legend wrapperStyle={{ fontSize: 10 }} />
+                <Legend
+                  layout="horizontal"
+                  verticalAlign="bottom"
+                  align="center"
+                  wrapperStyle={{ fontSize: 10 }}
+                />
               </PieChart>
             </ResponsiveContainer>
-          </div>
+          </Widget>
         </div>
       )}
     </div>
