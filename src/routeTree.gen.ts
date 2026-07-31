@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CascoRouteImport } from './routes/casco'
+import { Route as IntegralRouteImport } from './routes/integral'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +23,40 @@ const CascoRoute = CascoRouteImport.update({
   path: '/casco',
   getParentRoute: () => rootRouteImport,
 } as any)
+const IntegralRoute = IntegralRouteImport.update({
+  id: '/integral',
+  path: '/integral',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/casco': typeof CascoRoute
+  '/integral': typeof IntegralRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/casco': typeof CascoRoute
+  '/integral': typeof IntegralRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/casco': typeof CascoRoute
+  '/integral': typeof IntegralRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/casco'
+  fullPaths: '/' | '/casco' | '/integral'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/casco'
-  id: '__root__' | '/' | '/casco'
+  to: '/' | '/casco' | '/integral'
+  id: '__root__' | '/' | '/casco' | '/integral'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CascoRoute: typeof CascoRoute
+  IntegralRoute: typeof IntegralRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +75,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CascoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/integral': {
+      id: '/integral'
+      path: '/integral'
+      fullPath: '/integral'
+      preLoaderRoute: typeof IntegralRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CascoRoute: CascoRoute,
+  IntegralRoute: IntegralRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
