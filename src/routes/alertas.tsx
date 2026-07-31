@@ -4,6 +4,7 @@ import { listar, type SinistroRecord } from "@/lib/dataStore";
 import type { ModuleKey } from "@/lib/schema";
 import { formatCurrency, formatDate, toNumber } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { AlertTriangle, Clock, FileWarning } from "lucide-react";
 
 export const Route = createFileRoute("/alertas")({
@@ -19,6 +20,7 @@ export const Route = createFileRoute("/alertas")({
 });
 
 const DIAS_PARADO = 30;
+const PAGINA = 50;
 
 interface Linha {
   modulo: ModuleKey;
@@ -44,6 +46,7 @@ function diasDesde(data: string): number | null {
 
 function Alertas() {
   const [linhas, setLinhas] = useState<Linha[]>([]);
+  const [limite, setLimite] = useState<Record<string, number>>({});
 
   useEffect(() => {
     void Promise.all([listar("casco"), listar("integral")]).then(([c, i]) => {
@@ -107,6 +110,8 @@ function Alertas() {
     },
   ];
 
+  const cap = (t: string) => limite[t] ?? PAGINA;
+
   return (
     <div className="space-y-5">
       <div>
@@ -118,7 +123,7 @@ function Alertas() {
 
       <div className="grid gap-4 sm:grid-cols-3">
         {grupos.map((g) => (
-          <div key={g.titulo} className="rounded-lg border bg-card p-4">
+          <div key={g.titulo} className="rounded-xl border bg-card p-4 shadow-sm">
             <div className="flex items-center gap-2">
               <g.icon className={`h-4 w-4 ${g.cor}`} />
               <p className="text-xs text-muted-foreground">{g.titulo}</p>
@@ -128,55 +133,64 @@ function Alertas() {
         ))}
       </div>
 
-      {grupos.map((g) => (
-        <div key={g.titulo} className="rounded-lg border bg-card">
-          <div className="flex items-center gap-2 border-b px-4 py-3">
-            <g.icon className={`h-4 w-4 ${g.cor}`} />
-            <div>
-              <h2 className="text-sm font-semibold">{g.titulo}</h2>
-              <p className="text-xs text-muted-foreground">{g.desc}</p>
+      {grupos.map((g) => {
+        const visiveis = g.itens.slice(0, cap(g.titulo));
+        return (
+          <div key={g.titulo} className="rounded-xl border bg-card shadow-sm">
+            <div className="flex items-center gap-2 border-b px-4 py-3">
+              <g.icon className={`h-4 w-4 ${g.cor}`} />
+              <div>
+                <h2 className="text-sm font-semibold">{g.titulo}</h2>
+                <p className="text-xs text-muted-foreground">{g.desc}</p>
+              </div>
+              <Badge variant="secondary" className="ml-auto">
+                {g.itens.length}
+              </Badge>
             </div>
-            <Badge variant="secondary" className="ml-auto">
-              {g.itens.length}
-            </Badge>
+            {g.itens.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+                Nenhuma pendência nesta categoria.
+              </p>
+            ) : (
+              <div className="divide-y">
+                {visiveis.map((l) => (
+                  <div
+                    key={`${l.modulo}:${l.rec.id}`}
+                    className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 text-sm"
+                  >
+                    <Badge variant="outline" className="text-[10px]">
+                      {l.modulo === "casco" ? "Casco" : "Integral"}
+                    </Badge>
+                    <span className="font-medium">{l.rec["numero_processo"] || "s/ processo"}</span>
+                    <span className="text-muted-foreground">{l.rec["nome_segurado"] || "—"}</span>
+                    <span className="text-muted-foreground">{l.rec["contratante"] || ""}</span>
+                    <span className="text-muted-foreground">
+                      Aviso: {formatDate(l.rec["data_aviso"]) || "—"}
+                    </span>
+                    <span className="text-muted-foreground">{l.rec["status_processo"] || "—"}</span>
+                    <Badge className="ml-auto">{g.badge(l)}</Badge>
+                  </div>
+                ))}
+
+                {g.itens.length > visiveis.length && (
+                  <div className="flex justify-center px-4 py-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setLimite((p) => ({ ...p, [g.titulo]: (p[g.titulo] ?? PAGINA) + PAGINA }))
+                      }
+                    >
+                      Carregar mais {Math.min(PAGINA, g.itens.length - visiveis.length)} (de{" "}
+                      {g.itens.length})
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          {g.itens.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-              Nenhuma pendência nesta categoria.
-            </p>
-          ) : (
-            <div className="divide-y">
-              {g.itens.slice(0, 50).map((l) => (
-                <div
-                  key={`${l.modulo}:${l.rec.id}`}
-                  className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 text-sm"
-                >
-                  <Badge variant="outline" className="text-[10px]">
-                    {l.modulo === "casco" ? "Casco" : "Integral"}
-                  </Badge>
-                  <span className="font-medium">
-                    {l.rec["numero_processo"] || "s/ processo"}
-                  </span>
-                  <span className="text-muted-foreground">{l.rec["nome_segurado"] || "—"}</span>
-                  <span className="text-muted-foreground">{l.rec["contratante"] || ""}</span>
-                  <span className="text-muted-foreground">
-                    Aviso: {formatDate(l.rec["data_aviso"]) || "—"}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {l.rec["status_processo"] || "—"}
-                  </span>
-                  <Badge className="ml-auto">{g.badge(l)}</Badge>
-                </div>
-              ))}
-              {g.itens.length > 50 && (
-                <p className="px-4 py-2 text-center text-xs text-muted-foreground">
-                  Mostrando 50 de {g.itens.length}.
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
