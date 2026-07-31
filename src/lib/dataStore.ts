@@ -92,7 +92,7 @@ export async function criar(
       campo: "_registro",
       campo_label: "Registro criado",
       valor_antigo: null,
-      valor_novo: norm(record.numero_processo) || "—",
+      valor_novo: norm(record['numero_processo']) || "—",
       acao: "criacao",
       usuario,
       criado_em: now,
@@ -110,7 +110,7 @@ export async function atualizar(
   const rows = read<SinistroRecord>(KEY(modulo));
   const idx = rows.findIndex((r) => r.id === id);
   if (idx === -1) return null;
-  const anterior = rows[idx];
+  const anterior = rows[idx]!;
   const now = new Date().toISOString();
   const fields = MODULES[modulo].fields;
 
@@ -163,7 +163,7 @@ export async function excluir(modulo: ModuleKey, id: string, usuario: string): P
       record_id: id,
       campo: "_registro",
       campo_label: "Registro excluído",
-      valor_antigo: norm(alvo?.numero_processo) || "—",
+      valor_antigo: norm(alvo?.['numero_processo']) || "—",
       valor_novo: null,
       acao: "exclusao",
       usuario,
@@ -199,9 +199,9 @@ export async function upsertPorProcesso(
   let criados = 0;
   let atualizados = 0;
   for (const linha of linhas) {
-    const proc = norm(linha.numero_processo);
+    const proc = norm(linha['numero_processo']);
     const existente = proc
-      ? read<SinistroRecord>(KEY(modulo)).find((r) => norm(r.numero_processo) === proc)
+      ? read<SinistroRecord>(KEY(modulo)).find((r) => norm(r['numero_processo']) === proc)
       : undefined;
     if (existente) {
       await atualizar(modulo, existente.id, { ...existente, ...linha }, usuario);
