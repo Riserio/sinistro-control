@@ -29,7 +29,6 @@ const NAV = [
   { to: "/esteira", label: "Esteira", icon: Workflow },
   { to: "/alertas", label: "Alertas", icon: BellRing },
   { to: "/importar", label: "Importar", icon: Upload },
-  { to: "/configuracoes", label: "Configurações", icon: Settings },
 ] as const;
 
 const finalizado = (s: string) => {
@@ -66,7 +65,7 @@ function LogoBP({ colapsada }: { colapsada: boolean }) {
       src={BP_LOGO}
       alt="BP Seguradora"
       onError={() => setErro(true)}
-      className={colapsada ? "h-8 w-8 object-contain object-left" : "h-9 w-auto object-contain"}
+      className={colapsada ? "h-8 w-8 object-contain" : "h-9 w-auto object-contain"}
     />
   );
 }
@@ -149,19 +148,26 @@ export function AppLayout() {
           colapsada ? "w-16" : "w-60"
         }`}
       >
+        {/* Topo: logo + botão recolher/expandir */}
         <div
-          className={`flex h-16 items-center border-b ${colapsada ? "justify-center px-2" : "justify-between px-3"}`}
+          className={`border-b ${
+            colapsada
+              ? "flex flex-col items-center gap-2 px-2 py-3"
+              : "flex h-16 items-center justify-between px-3"
+          }`}
         >
           <LogoBP colapsada={colapsada} />
-          {!colapsada && (
-            <button
-              onClick={toggle}
-              title="Recolher menu"
-              className="rounded-md border p-1.5 text-muted-foreground hover:bg-muted"
-            >
+          <button
+            onClick={toggle}
+            title={colapsada ? "Expandir menu" : "Recolher menu"}
+            className="rounded-md border p-1.5 text-muted-foreground hover:bg-muted"
+          >
+            {colapsada ? (
+              <PanelLeftOpen className="h-4 w-4" />
+            ) : (
               <PanelLeftClose className="h-4 w-4" />
-            </button>
-          )}
+            )}
+          </button>
         </div>
 
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
@@ -194,10 +200,23 @@ export function AppLayout() {
           ))}
         </nav>
 
-        <div className="border-t p-2">
+        {/* Rodapé: Configurações + Sair */}
+        <div className="space-y-1 border-t p-2">
+          <Link
+            to="/configuracoes"
+            title={colapsada ? "Configurações" : undefined}
+            activeProps={{ className: "bg-primary/10 text-primary font-medium" }}
+            inactiveProps={{ className: "text-muted-foreground hover:bg-muted" }}
+            className={`flex items-center rounded-md py-2 text-sm transition-colors ${
+              colapsada ? "justify-center px-2" : "gap-3 px-3"
+            }`}
+          >
+            <Settings className="h-4 w-4 shrink-0" />
+            {!colapsada && <span>Configurações</span>}
+          </Link>
           <button
             onClick={logout}
-            title="Sair"
+            title={colapsada ? "Sair" : undefined}
             className={`flex w-full items-center rounded-md py-2 text-sm text-muted-foreground hover:bg-muted ${
               colapsada ? "justify-center px-2" : "gap-3 px-3"
             }`}
@@ -205,15 +224,6 @@ export function AppLayout() {
             <LogOut className="h-4 w-4 shrink-0" />
             {!colapsada && <span>Sair</span>}
           </button>
-          {colapsada && (
-            <button
-              onClick={toggle}
-              title="Expandir menu"
-              className="mt-1 flex w-full items-center justify-center rounded-md border p-1.5 text-muted-foreground hover:bg-muted"
-            >
-              <PanelLeftOpen className="h-4 w-4" />
-            </button>
-          )}
         </div>
       </aside>
 
@@ -224,7 +234,7 @@ export function AppLayout() {
       >
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b bg-card px-4 md:px-6">
           <div className="flex min-w-0 items-center gap-2 overflow-x-auto md:hidden">
-            {NAV.map(({ to, label }) => (
+            {[...NAV, { to: "/configuracoes", label: "Configurações" }].map(({ to, label }) => (
               <Link
                 key={to}
                 to={to}
