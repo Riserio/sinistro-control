@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Upload, DatabaseBackup, CheckCircle2 } from "lucide-react";
+import { Upload, DatabaseBackup, CheckCircle2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/importar")({
@@ -148,6 +148,18 @@ function Importar() {
     } catch {
       toast.error("Backup inválido. Selecione um arquivo .json gerado pelo botão Backup.");
     }
+  }
+
+  function limparTudo() {
+    const ok = window.confirm(
+      "Limpar TODOS os dados de teste (Casco, Indenização Integral e histórico) deste navegador? Esta ação não pode ser desfeita.",
+    );
+    if (!ok) return;
+    ["bp_sinistros_casco", "bp_sinistros_integral", "bp_sinistros_audit"].forEach((k) =>
+      window.localStorage.removeItem(k),
+    );
+    toast.success("Base de teste limpa.", { description: "Recarregando a aplicação…" });
+    setTimeout(() => window.location.reload(), 600);
   }
 
   const colsMapeadas = preview ? preview.colunas.filter((c) => preview.mapeadas[c]) : [];
@@ -307,6 +319,18 @@ function Importar() {
         <Button variant="outline" size="sm" className="mt-3 gap-2" onClick={() => backupRef.current?.click()}>
           <Upload className="h-4 w-4" />
           Selecionar backup (.json)
+        </Button>
+      </div>
+
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+        <h2 className="text-sm font-semibold text-destructive">Manutenção (modo demonstração)</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Remove todos os registros e o histórico salvos neste navegador, para recomeçar os testes
+          do zero. Faça um <strong>Backup</strong> antes se quiser guardar o que já cadastrou.
+        </p>
+        <Button variant="destructive" size="sm" className="mt-3 gap-2" onClick={limparTudo}>
+          <Trash2 className="h-4 w-4" />
+          Limpar dados (demo)
         </Button>
       </div>
     </div>
