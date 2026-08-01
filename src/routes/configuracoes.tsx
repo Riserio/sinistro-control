@@ -6,11 +6,15 @@ import {
   excluirUsuario,
   getRegras,
   setRegras,
+  listarSolicitacoesPendentes,
+  decidirSolicitacao,
   FATORES,
   type Usuario,
   type Fator,
   type Perfil,
+  type SolicitacaoAcesso,
 } from "@/lib/config";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,37 +72,58 @@ function Configuracoes() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [editando, setEditando] = useState<Usuario | null>(null);
   const [dias, setDias] = useState(30);
+  const [pendentes, setPendentes] = useState<SolicitacaoAcesso[]>([]);
 
   useEffect(() => {
-    setUsuarios(listarUsuarios());
-    setDias(getRegras().dias_parado);
+    void listarUsuarios().then(setUsuarios);
+    void getRegras().then((r) => setDias(r.dias_parado));
+    void listarSolicitacoesPendentes().then(setPendentes);
   }, []);
 
   function recarregar() {
-    setUsuarios(listarUsuarios());
+    void listarUsuarios().then(setUsuarios);
+    void listarSolicitacoesPendentes().then(setPendentes);
   }
 
-  function salvar() {
+  async function salvar() {
     if (!editando) return;
     if (!editando.nome.trim() || !editando.email.trim()) {
       toast.error("Preencha nome e e-mail.");
       return;
     }
-    salvarUsuario(editando);
-    toast.success("Usuário salvo.");
-    setEditando(null);
-    recarregar();
+    if (!editando.id && (editando.senha ?? "").length < 6) {
+      toast.error("Defina uma senha com pelo menos 6 caracteres.");
+      return;
+    }
+    try {
+      await salvarUsuario(editando);
+      toast.success("Usuário salvo.");
+      setEditando(null);
+      recarregar();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível salvar o usuário.");
+    }
   }
 
-  function remover(u: Usuario) {
+  async function remover(u: Usuario) {
     if (!window.confirm(`Excluir o usuário ${u.nome}?`)) return;
-    excluirUsuario(u.id);
-    toast.success("Usuário excluído.");
-    recarregar();
+    try {
+      await excluirUsuario(u.id);
+      toast.success("Usuário excluído.");
+      recarregar();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível excluir o usuário.");
+    }
   }
 
-  function salvarRegras() {
-    setRegras({ dias_parado: Math.max(1, Number(dias) || 30) });
+  async function decidir(id: string, aprovar: boolean) {
+    await decidirSolicitacao(id, aprovar);
+    toast.success(aprovar ? "Acesso aprovado." : "Acesso negado.");
+    void listarSolicitacoesPendentes().then(setPendentes);
+  }
+
+  async function salvarRegras() {
+    await setRegras({ dias_parado: Math.max(1, Number(dias) || 30) });
     toast.success("Regras de alerta atualizadas.");
   }
 
@@ -116,16 +141,58 @@ function Configuracoes() {
       <div className="flex items-start gap-2 rounded-lg border bg-amber-50 p-3 text-xs text-amber-900">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         <span>
-          Modo demonstração — usuários e regras ficam salvos apenas neste navegador. Autenticação,
-          2º fator e IP passam a ser realmente aplicados quando o backend for ativado.
+          Usuários, 2º fator e regras ficam salvos no banco e valem para todos. O 2º fator por IP é
+          validado no servidor (IP lido dos cabeçalhos da requisição); em redes com proxy/VPN o IP
+          pode variar.
         </span>
       </div>
 
       <Tabs defaultValue="usuarios">
         <TabsList>
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
+          <TabsTrigger value="acessos">Acessos pendentes{pendentes.length ? ` (${pendentes.length})` : ""}</TabsTrigger>
           <TabsTrigger value="alertas">Regras de alertas</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="acessos" className="mt-4 space-y-3">
+          <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Usuário</TableHead>
+                  <TableHead>E-mail</TableHead>
+                  <TableHead>Solicitado em</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pendentes.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="font-medium">{s.nome}</TableCell>
+                    <TableCell>{s.email}</TableCell>
+                    <TableCell>{new Date(s.criado_em).toLocaleString("pt-BR")}</TableCell>
+                    <TableCell className="space-x-2 text-right">
+                      <Button size="sm" onClick={() => void decidir(s.id, true)}>
+                        Aprovar
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => void decidir(s.id, false)}>
+                        Negar
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {pendentes.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">
+                      Nenhum acesso aguardando aprovação.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
 
         <TabsContent value="usuarios" className="mt-4 space-y-3">
           <div className="flex justify-end">

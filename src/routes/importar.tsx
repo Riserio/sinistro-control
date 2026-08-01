@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { MODULES, type ModuleKey, type FieldDef } from "@/lib/schema";
-import { upsertPorProcesso, restaurarBackup, type BackupData } from "@/lib/dataStore";
+import { upsertPorProcesso, restaurarBackup, limparBase, type BackupData } from "@/lib/dataStore";
 import { useUsuarioAtual } from "@/components/UserProvider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -141,8 +141,8 @@ function Importar() {
     try {
       const texto = await file.text();
       const data = JSON.parse(texto) as Partial<BackupData>;
-      const r = restaurarBackup(data);
-      toast.success("Backup restaurado.", {
+      const r = await restaurarBackup(data);
+      toast.success("Backup restaurado no banco.", {
         description: `Casco: ${r.casco} • Integral: ${r.integral}. Recarregue as telas.`,
       });
     } catch {
@@ -150,17 +150,16 @@ function Importar() {
     }
   }
 
-  function limparTudo() {
+  async function limparTudo() {
     const ok = window.confirm(
-      "Limpar TODOS os dados de teste (Casco, Indenização Integral e histórico) deste navegador? Esta ação não pode ser desfeita.",
+      "Limpar TODOS os sinistros (Casco e Indenização Integral) do banco? Esta ação não pode ser desfeita.",
     );
     if (!ok) return;
-    ["bp_sinistros_casco", "bp_sinistros_integral", "bp_sinistros_audit"].forEach((k) =>
-      window.localStorage.removeItem(k),
-    );
-    toast.success("Base de teste limpa.", { description: "Recarregando a aplicação…" });
+    await limparBase();
+    toast.success("Base limpa.", { description: "Recarregando a aplicação…" });
     setTimeout(() => window.location.reload(), 600);
   }
+
 
   const colsMapeadas = preview ? preview.colunas.filter((c) => preview.mapeadas[c]) : [];
 
@@ -193,7 +192,7 @@ function Importar() {
           {sheets && (
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Aba da planilha</label>
-              <Select value={abaSel ?? undefined} onValueChange={setAbaSel}>
+              <Select value={abaSel ?? ""} onValueChange={setAbaSel}>
                 <SelectTrigger className="w-64">
                   <SelectValue placeholder="Escolha a aba" />
                 </SelectTrigger>

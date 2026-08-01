@@ -79,11 +79,13 @@ export function AppLayout() {
   const [colapsada, setColapsada] = useState(false);
 
   useEffect(() => {
-    const s = getSessao();
-    setSessao(s);
-    setPronto(true);
-    if (!s && pathname !== "/login") void navigate({ to: "/login" });
+    void getSessao().then((s) => {
+      setSessao(s);
+      setPronto(true);
+      if (!s && pathname !== "/login") void navigate({ to: "/login" });
+    });
   }, [pathname, navigate]);
+
 
   useEffect(() => {
     const v = window.localStorage.getItem("bp_sidebar_colapsada");
@@ -92,8 +94,9 @@ export function AppLayout() {
 
   useEffect(() => {
     if (!sessao) return;
-    const limite = getRegras().dias_parado;
-    void Promise.all([listar("casco"), listar("integral")]).then(([c, i]) => {
+    void Promise.all([getRegras(), listar("casco"), listar("integral")]).then(([reg, c, i]) => {
+      const limite = reg.dias_parado;
+
       const todos = [...c, ...i];
       const atencao = todos.filter((r) => {
         const pendente = toNumber(r["valor_pendente"]) > 0;
@@ -116,8 +119,8 @@ export function AppLayout() {
     });
   }
 
-  function baixarBackup() {
-    const data = exportarBackup();
+  async function baixarBackup() {
+    const data = await exportarBackup();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -130,9 +133,10 @@ export function AppLayout() {
     });
   }
 
-  function logout() {
-    sair();
+  async function logout() {
+    await sair();
     setSessao(null);
+
     toast.success("Sessão encerrada.");
     void navigate({ to: "/login" });
   }
@@ -266,9 +270,10 @@ export function AppLayout() {
         <div className="flex items-center gap-2 border-b bg-amber-50 px-4 py-2 text-xs text-amber-900 md:px-6">
           <Info className="h-3.5 w-3.5 shrink-0" />
           <span>
-            Modo demonstração — dados salvos apenas neste navegador. Login, 2º fator e histórico
-            compartilhado serão realmente aplicados com o backend.
+            Dados salvos no banco de dados da BP — compartilhados entre todos os usuários, com
+            login e histórico de alterações por usuário.
           </span>
+
         </div>
 
         <main className="min-w-0 flex-1 p-4 md:p-6">

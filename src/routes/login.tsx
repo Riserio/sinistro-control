@@ -1,18 +1,32 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { autenticar, entrar, getSessao, FATORES, type Usuario } from "@/lib/config";
+import {
+  autenticar,
+  entrar,
+  getSessao,
+  sair,
+  conferirPalavraChave,
+  conferirIp,
+  solicitarAutorizacao,
+  statusSolicitacao,
+  FATORES,
+  type Usuario,
+} from "@/lib/config";
 import { BP_LOGO } from "@/lib/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Info, ShieldCheck, KeyRound, MapPin, Clock } from "lucide-react";
+import { Info, ShieldCheck, KeyRound, MapPin, Clock, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
       { title: "Acesso | BP Seguradora" },
-      { name: "description", content: "Login do sistema de controle de sinistros da BP Seguradora." },
+      {
+        name: "description",
+        content: "Login do sistema de controle de sinistros da BP Seguradora.",
+      },
     ],
   }),
   component: Login,
@@ -25,21 +39,38 @@ function Login() {
   const [senha, setSenha] = useState("");
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [chave, setChave] = useState("");
-  const [ip, setIp] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+  const [solicitacaoId, setSolicitacaoId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (getSessao()) void navigate({ to: "/" });
+    void getSessao().then((s) => {
+      if (s) void navigate({ to: "/" });
+    });
   }, [navigate]);
 
-  function verificarCredenciais(e: React.FormEvent) {
+  async function verificarCredenciais(e: React.FormEvent) {
     e.preventDefault();
-    const u = autenticar(email, senha);
-    if (!u) {
-      toast.error("E-mail ou senha inválidos.");
-      return;
+    setOcupado(true);
+    try {
+      const u = await autenticar(email, senha);
+      if (!u) {
+        toast.error("E-mail ou senha inválidos.");
+        return;
+      }
+      setUsuario(u);
+      setEtapa("fator");
+      if (u.fator === "autorizacao") {
+        const s = await solicitarAutorizacao(u);
+        if (s) {
+          setSolicitacaoId(s.id);
+          if (s.status === "aprovado") concluir(u);
+        }
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível entrar.");
+    } finally {
+      setOcupado(false);
     }
-    setUsuario(u);
-    setEtapa("fator");
   }
 
   function concluir(u: Usuario) {
@@ -48,22 +79,51 @@ function Login() {
     void navigate({ to: "/" });
   }
 
-  function verificarFator(e: React.FormEvent) {
+  async function verificarFator(e: React.FormEvent) {
     e.preventDefault();
     if (!usuario) return;
-    if (usuario.fator === "palavra_chave") {
-      if ((chave || "").trim() !== (usuario.palavra_chave || "").trim()) {
-        toast.error("Palavra-chave incorreta.");
-        return;
+    setOcupado(true);
+    try {
+      if (usuario.fator === "palavra_chave") {
+        if (!(await conferirPalavraChave(usuario, chave))) {
+          toast.error("Palavra-chave incorreta.");
+          return;
+        }
+        concluir(usuario);
+      } else if (usuario.fator === "ip") {
+        const r = await conferirIp();
+        if (!r.ok) {
+          toast.error(`IP de origem (${r.ip}) não corresponde ao IP autorizado.`);
+          return;
+        }
+        concluir(usuario);
       }
-      concluir(usuario);
-    } else if (usuario.fator === "ip") {
-      if ((ip || "").trim() !== (usuario.ip_permitido || "").trim()) {
-        toast.error("IP não corresponde ao IP autorizado para este usuário.");
-        return;
-      }
-      concluir(usuario);
+    } catch {
+      toast.error("Não foi possível validar o 2º fator.");
+    } finally {
+      setOcupado(false);
     }
+  }
+
+  async function conferirAprovacao() {
+    if (!usuario || !solicitacaoId) return;
+    setOcupado(true);
+    try {
+      const st = await statusSolicitacao(solicitacaoId);
+      if (st === "aprovado") concluir(usuario);
+      else if (st === "negado") toast.error("Acesso negado pelo administrador.");
+      else toast.info("Ainda aguardando a autorização de um administrador.");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function voltar() {
+    await sair();
+    setEtapa("credenciais");
+    setUsuario(null);
+    setChave("");
+    setSolicitacaoId(null);
   }
 
   const fatorInfo = usuario ? FATORES.find((f) => f.valor === usuario.fator) : undefined;
@@ -79,9 +139,8 @@ function Login() {
         <div className="flex items-start gap-2 rounded-lg border bg-amber-50 p-3 text-xs text-amber-900">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
-            Modo demonstração — este login é apenas visual (sem segurança real). Acesso padrão:{" "}
-            <strong>admin@bp.com</strong> / <strong>admin123</strong>, palavra-chave{" "}
-            <strong>bp2024</strong>. Não use senhas reais.
+            Acesso restrito aos colaboradores da BP Seguradora. Não tem acesso? Peça a um
+            administrador para cadastrar o seu usuário em Configurações.
           </span>
         </div>
 
@@ -119,7 +178,8 @@ function Login() {
                   required
                 />
               </div>
-              <Button type="submit" className="w-full">
+              <Button type="submit" className="w-full gap-2" disabled={ocupado}>
+                {ocupado && <Loader2 className="h-4 w-4 animate-spin" />}
                 Continuar
               </Button>
             </form>
@@ -147,7 +207,8 @@ function Login() {
                       required
                     />
                   </div>
-                  <Button type="submit" className="w-full">
+                  <Button type="submit" className="w-full gap-2" disabled={ocupado}>
+                    {ocupado && <Loader2 className="h-4 w-4 animate-spin" />}
                     Acessar
                   </Button>
                 </form>
@@ -156,21 +217,11 @@ function Login() {
               {usuario?.fator === "ip" && (
                 <form onSubmit={verificarFator} className="space-y-3">
                   <p className="rounded-md bg-muted p-2 text-xs">
-                    IP autorizado para este usuário: <strong>{usuario.ip_permitido || "—"}</strong>
+                    IP autorizado para este usuário: <strong>{usuario.ip_permitido || "—"}</strong>.
+                    O IP de origem é lido no servidor a partir da sua requisição.
                   </p>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="ip" className="text-xs text-muted-foreground">
-                      IP de origem (simulado na demonstração)
-                    </Label>
-                    <Input
-                      id="ip"
-                      value={ip}
-                      onChange={(e) => setIp(e.target.value)}
-                      placeholder={usuario.ip_permitido || "0.0.0.0"}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full">
+                  <Button type="submit" className="w-full gap-2" disabled={ocupado}>
+                    {ocupado && <Loader2 className="h-4 w-4 animate-spin" />}
                     Verificar e acessar
                   </Button>
                 </form>
@@ -179,11 +230,16 @@ function Login() {
               {usuario?.fator === "autorizacao" && (
                 <div className="space-y-3">
                   <p className="rounded-md bg-muted p-2 text-xs">
-                    Acesso pendente de autorização de um administrador. No sistema real, o admin
-                    aprova este login; aqui você pode simular a aprovação.
+                    Seu acesso foi registrado e está aguardando a autorização de um administrador
+                    (Configurações → Acessos pendentes).
                   </p>
-                  <Button className="w-full" onClick={() => usuario && concluir(usuario)}>
-                    Simular autorização e acessar
+                  <Button
+                    className="w-full gap-2"
+                    disabled={ocupado}
+                    onClick={() => void conferirAprovacao()}
+                  >
+                    {ocupado && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Já fui autorizado — acessar
                   </Button>
                 </div>
               )}
@@ -192,12 +248,7 @@ function Login() {
                 variant="ghost"
                 size="sm"
                 className="w-full"
-                onClick={() => {
-                  setEtapa("credenciais");
-                  setUsuario(null);
-                  setChave("");
-                  setIp("");
-                }}
+                onClick={() => void voltar()}
               >
                 Voltar
               </Button>
