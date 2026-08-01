@@ -85,7 +85,7 @@ function Login() {
     setOcupado(true);
     try {
       if (usuario.fator === "palavra_chave") {
-        if (!conferirPalavraChave(usuario, chave)) {
+        if (!(await conferirPalavraChave(usuario, chave))) {
           toast.error("Palavra-chave incorreta.");
           return;
         }

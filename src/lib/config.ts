@@ -11,6 +11,7 @@ import {
   atualizarUsuarioFn,
   excluirUsuarioFn,
   validarIpFn,
+  validarPalavraChaveFn,
 } from "@/lib/usuarios.functions";
 
 export type Fator = "palavra_chave" | "autorizacao" | "ip";
@@ -161,9 +162,10 @@ export async function autenticar(email: string, senha: string): Promise<Usuario 
   return usuario;
 }
 
-/** Valida a palavra-chave cadastrada no perfil. */
-export function conferirPalavraChave(u: Usuario, valor: string): boolean {
-  return (valor || "").trim() === (u.palavra_chave || "").trim() && !!(u.palavra_chave || "").trim();
+/** Valida a palavra-chave cadastrada no perfil (conferida no servidor). */
+export async function conferirPalavraChave(_u: Usuario, valor: string): Promise<boolean> {
+  const r = await validarPalavraChaveFn({ data: { valor } });
+  return r.ok;
 }
 
 /**
