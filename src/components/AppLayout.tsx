@@ -79,11 +79,13 @@ export function AppLayout() {
   const [colapsada, setColapsada] = useState(false);
 
   useEffect(() => {
-    const s = getSessao();
-    setSessao(s);
-    setPronto(true);
-    if (!s && pathname !== "/login") void navigate({ to: "/login" });
+    void getSessao().then((s) => {
+      setSessao(s);
+      setPronto(true);
+      if (!s && pathname !== "/login") void navigate({ to: "/login" });
+    });
   }, [pathname, navigate]);
+
 
   useEffect(() => {
     const v = window.localStorage.getItem("bp_sidebar_colapsada");
