@@ -159,3 +159,27 @@ export const validarIpFn = createServerFn({ method: "POST" })
     const permitido = (data?.ip_permitido ?? "").trim();
     return { ok: !!permitido && !!ip && permitido === ip, ip: ip || "desconhecido" };
   });
+
+/** Confere a palavra-chave do 2º fator no servidor (não no navegador). */
+export const validarPalavraChaveFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ valor: z.string() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as {
+      from: (t: string) => {
+        select: (c: string) => {
+          eq: (
+            c: string,
+            v: string,
+          ) => { maybeSingle: () => Promise<{ data: { palavra_chave?: string | null } | null }> };
+        };
+      };
+    };
+    const { data: p } = await sb
+      .from("profiles")
+      .select("palavra_chave")
+      .eq("id", context.userId)
+      .maybeSingle();
+    const esperado = (p?.palavra_chave ?? "").trim();
+    return { ok: !!esperado && esperado === data.valor.trim() };
+  });
