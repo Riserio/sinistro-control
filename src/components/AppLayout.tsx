@@ -6,6 +6,7 @@ import {
   ShieldCheck,
   Workflow,
   BellRing,
+  FileText,
   Upload,
   Settings,
   Info,
@@ -28,6 +29,7 @@ const NAV = [
   { to: "/casco", label: "Casco - Perda Parcial", icon: CarFront },
   { to: "/esteira", label: "Esteira", icon: Workflow },
   { to: "/alertas", label: "Alertas", icon: BellRing },
+  { to: "/relatorios", label: "Relatórios", icon: FileText },
   { to: "/importar", label: "Importar", icon: Upload },
 ] as const;
 
