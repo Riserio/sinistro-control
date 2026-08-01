@@ -6,7 +6,22 @@ import { getRegras } from "@/lib/config";
 import { formatCurrency, formatDate, toNumber } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Clock, FileWarning } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { SinistroForm } from "@/components/sinistros/SinistroForm";
+import { AlertTriangle, Clock, FileWarning, ChevronDown, ChevronRight, Pencil } from "lucide-react";
 
 export const Route = createFileRoute("/alertas")({
   head: () => ({
@@ -47,20 +62,22 @@ function diasDesde(data: string): number | null {
 function Alertas() {
   const [linhas, setLinhas] = useState<Linha[]>([]);
   const [limite, setLimite] = useState<Record<string, number>>({});
+  const [aberto, setAberto] = useState<Record<string, boolean>>({});
   const [diasParado, setDiasParado] = useState(30);
+  const [editando, setEditando] = useState<Linha | null>(null);
 
-  useEffect(() => {
-    void getRegras().then((r) => setDiasParado(r.dias_parado));
-  }, []);
-
-
-  useEffect(() => {
+  function carregar() {
     void Promise.all([listar("casco"), listar("integral")]).then(([c, i]) => {
       setLinhas([
         ...c.map((rec) => ({ modulo: "casco" as ModuleKey, rec })),
         ...i.map((rec) => ({ modulo: "integral" as ModuleKey, rec })),
       ]);
     });
+  }
+
+  useEffect(() => {
+    void getRegras().then((r) => setDiasParado(r.dias_parado));
+    carregar();
   }, []);
 
   const pendentes = useMemo(
@@ -93,7 +110,8 @@ function Alertas() {
       icon: AlertTriangle,
       cor: "text-amber-600",
       itens: pendentes,
-      badge: (l: Linha) => formatCurrency(toNumber(l.rec["valor_pendente"])),
+      coluna: "Pendente",
+      valor: (l: Linha) => formatCurrency(toNumber(l.rec["valor_pendente"])),
     },
     {
       titulo: `Processos parados (> ${diasParado} dias)`,
@@ -101,7 +119,8 @@ function Alertas() {
       icon: Clock,
       cor: "text-red-600",
       itens: parados,
-      badge: (l: Linha) => {
+      coluna: "Parado há",
+      valor: (l: Linha) => {
         const d = diasDesde(String(l.rec["data_aviso"] ?? ""));
         return d ? `${d} dias` : "—";
       },
@@ -112,7 +131,8 @@ function Alertas() {
       icon: FileWarning,
       cor: "text-violet-600",
       itens: incompletos,
-      badge: () => "revisar",
+      coluna: "Situação",
+      valor: () => "revisar",
     },
   ];
 
@@ -123,27 +143,40 @@ function Alertas() {
       <div>
         <h1 className="text-xl font-semibold">Alertas e Pendências</h1>
         <p className="text-sm text-muted-foreground">
-          Pontos que precisam de atenção nos dois módulos.
+          Clique em cada categoria para expandir. Os itens carregam de 50 em 50.
         </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
         {grupos.map((g) => (
-          <div key={g.titulo} className="rounded-xl border bg-card p-4 shadow-sm">
+          <button
+            key={g.titulo}
+            onClick={() => setAberto((p) => ({ ...p, [g.titulo]: !p[g.titulo] }))}
+            className="rounded-xl border bg-card p-4 text-left shadow-sm transition-colors hover:bg-muted/50"
+          >
             <div className="flex items-center gap-2">
               <g.icon className={`h-4 w-4 ${g.cor}`} />
               <p className="text-xs text-muted-foreground">{g.titulo}</p>
             </div>
             <p className="mt-1 text-2xl font-semibold">{g.itens.length}</p>
-          </div>
+          </button>
         ))}
       </div>
 
       {grupos.map((g) => {
-        const visiveis = g.itens.slice(0, cap(g.titulo));
+        const isOpen = !!aberto[g.titulo];
+        const visiveis = isOpen ? g.itens.slice(0, cap(g.titulo)) : [];
         return (
-          <div key={g.titulo} className="rounded-xl border bg-card shadow-sm">
-            <div className="flex items-center gap-2 border-b px-4 py-3">
+          <div key={g.titulo} className="overflow-hidden rounded-xl border bg-card shadow-sm">
+            <button
+              onClick={() => setAberto((p) => ({ ...p, [g.titulo]: !p[g.titulo] }))}
+              className="flex w-full items-center gap-2 border-b px-4 py-3 text-left hover:bg-muted/50"
+            >
+              {isOpen ? (
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              )}
               <g.icon className={`h-4 w-4 ${g.cor}`} />
               <div>
                 <h2 className="text-sm font-semibold">{g.titulo}</h2>
@@ -152,51 +185,109 @@ function Alertas() {
               <Badge variant="secondary" className="ml-auto">
                 {g.itens.length}
               </Badge>
-            </div>
-            {g.itens.length === 0 ? (
-              <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-                Nenhuma pendência nesta categoria.
-              </p>
-            ) : (
-              <div className="divide-y">
-                {visiveis.map((l) => (
-                  <div
-                    key={`${l.modulo}:${l.rec.id}`}
-                    className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 text-sm"
-                  >
-                    <Badge variant="outline" className="text-[10px]">
-                      {l.modulo === "casco" ? "Casco" : "Integral"}
-                    </Badge>
-                    <span className="font-medium">{l.rec["numero_processo"] || "s/ processo"}</span>
-                    <span className="text-muted-foreground">{l.rec["nome_segurado"] || "—"}</span>
-                    <span className="text-muted-foreground">{l.rec["contratante"] || ""}</span>
-                    <span className="text-muted-foreground">
-                      Aviso: {formatDate(l.rec["data_aviso"]) || "—"}
-                    </span>
-                    <span className="text-muted-foreground">{l.rec["status_processo"] || "—"}</span>
-                    <Badge className="ml-auto">{g.badge(l)}</Badge>
-                  </div>
-                ))}
+            </button>
 
-                {g.itens.length > visiveis.length && (
-                  <div className="flex justify-center px-4 py-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        setLimite((p) => ({ ...p, [g.titulo]: (p[g.titulo] ?? PAGINA) + PAGINA }))
-                      }
-                    >
-                      Carregar mais {Math.min(PAGINA, g.itens.length - visiveis.length)} (de{" "}
-                      {g.itens.length})
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
+            {isOpen &&
+              (g.itens.length === 0 ? (
+                <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+                  Nenhuma pendência nesta categoria.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-20">Módulo</TableHead>
+                        <TableHead>Nº Processo</TableHead>
+                        <TableHead>Segurado</TableHead>
+                        <TableHead>Contratante</TableHead>
+                        <TableHead>Aviso</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">{g.coluna}</TableHead>
+                        <TableHead className="w-16 text-right">Ação</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {visiveis.map((l) => (
+                        <TableRow key={`${l.modulo}:${l.rec.id}`}>
+                          <TableCell>
+                            <Badge variant="outline" className="text-[10px]">
+                              {l.modulo === "casco" ? "Casco" : "Integral"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap font-medium">
+                            {l.rec["numero_processo"] || "s/ processo"}
+                          </TableCell>
+                          <TableCell className="max-w-48 truncate">
+                            {l.rec["nome_segurado"] || "—"}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {l.rec["contratante"] || "—"}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {formatDate(l.rec["data_aviso"]) || "—"}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {l.rec["status_processo"] || "—"}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-right">
+                            <Badge>{g.valor(l)}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Editar / corrigir"
+                              onClick={() => setEditando(l)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+
+                  {g.itens.length > visiveis.length && (
+                    <div className="flex justify-center border-t px-4 py-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setLimite((p) => ({ ...p, [g.titulo]: (p[g.titulo] ?? PAGINA) + PAGINA }))
+                        }
+                      >
+                        Carregar mais {Math.min(PAGINA, g.itens.length - visiveis.length)} (de{" "}
+                        {g.itens.length})
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
           </div>
         );
       })}
+
+      <Dialog open={!!editando} onOpenChange={(o) => !o && setEditando(null)}>
+        <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Corrigir sinistro — {editando?.modulo === "casco" ? "Casco" : "Indenização Integral"}
+            </DialogTitle>
+          </DialogHeader>
+          {editando && (
+            <SinistroForm
+              modulo={editando.modulo}
+              registro={editando.rec}
+              onSaved={() => {
+                setEditando(null);
+                carregar();
+              }}
+              onCancel={() => setEditando(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
