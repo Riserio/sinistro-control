@@ -47,7 +47,12 @@ function diasDesde(data: string): number | null {
 function Alertas() {
   const [linhas, setLinhas] = useState<Linha[]>([]);
   const [limite, setLimite] = useState<Record<string, number>>({});
-  const diasParado = getRegras().dias_parado;
+  const [diasParado, setDiasParado] = useState(30);
+
+  useEffect(() => {
+    void getRegras().then((r) => setDiasParado(r.dias_parado));
+  }, []);
+
 
   useEffect(() => {
     void Promise.all([listar("casco"), listar("integral")]).then(([c, i]) => {
