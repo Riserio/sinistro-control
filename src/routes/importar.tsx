@@ -141,8 +141,8 @@ function Importar() {
     try {
       const texto = await file.text();
       const data = JSON.parse(texto) as Partial<BackupData>;
-      const r = restaurarBackup(data);
-      toast.success("Backup restaurado.", {
+      const r = await restaurarBackup(data);
+      toast.success("Backup restaurado no banco.", {
         description: `Casco: ${r.casco} • Integral: ${r.integral}. Recarregue as telas.`,
       });
     } catch {
@@ -150,17 +150,16 @@ function Importar() {
     }
   }
 
-  function limparTudo() {
+  async function limparTudo() {
     const ok = window.confirm(
-      "Limpar TODOS os dados de teste (Casco, Indenização Integral e histórico) deste navegador? Esta ação não pode ser desfeita.",
+      "Limpar TODOS os sinistros (Casco e Indenização Integral) do banco? Esta ação não pode ser desfeita.",
     );
     if (!ok) return;
-    ["bp_sinistros_casco", "bp_sinistros_integral", "bp_sinistros_audit"].forEach((k) =>
-      window.localStorage.removeItem(k),
-    );
-    toast.success("Base de teste limpa.", { description: "Recarregando a aplicação…" });
+    await limparBase();
+    toast.success("Base limpa.", { description: "Recarregando a aplicação…" });
     setTimeout(() => window.location.reload(), 600);
   }
+
 
   const colsMapeadas = preview ? preview.colunas.filter((c) => preview.mapeadas[c]) : [];
 
