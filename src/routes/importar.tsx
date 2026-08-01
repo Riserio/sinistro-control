@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { MODULES, type ModuleKey, type FieldDef } from "@/lib/schema";
-import { upsertPorProcesso, restaurarBackup, type BackupData } from "@/lib/dataStore";
+import { upsertPorProcesso, restaurarBackup, limparBase, type BackupData } from "@/lib/dataStore";
 import { useUsuarioAtual } from "@/components/UserProvider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
