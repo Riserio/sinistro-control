@@ -94,8 +94,9 @@ export function AppLayout() {
 
   useEffect(() => {
     if (!sessao) return;
-    const limite = getRegras().dias_parado;
-    void Promise.all([listar("casco"), listar("integral")]).then(([c, i]) => {
+    void Promise.all([getRegras(), listar("casco"), listar("integral")]).then(([reg, c, i]) => {
+      const limite = reg.dias_parado;
+
       const todos = [...c, ...i];
       const atencao = todos.filter((r) => {
         const pendente = toNumber(r["valor_pendente"]) > 0;
