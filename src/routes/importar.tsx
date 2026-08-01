@@ -192,7 +192,7 @@ function Importar() {
           {sheets && (
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Aba da planilha</label>
-              <Select value={abaSel ?? undefined} onValueChange={setAbaSel}>
+              <Select value={abaSel ?? ""} onValueChange={setAbaSel}>
                 <SelectTrigger className="w-64">
                   <SelectValue placeholder="Escolha a aba" />
                 </SelectTrigger>
