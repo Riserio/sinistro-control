@@ -17,6 +17,7 @@ import { Route as EsteiraRouteImport } from './routes/esteira'
 import { Route as ImportarRouteImport } from './routes/importar'
 import { Route as IntegralRouteImport } from './routes/integral'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as RelatoriosRouteImport } from './routes/relatorios'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -58,6 +59,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RelatoriosRoute = RelatoriosRouteImport.update({
+  id: '/relatorios',
+  path: '/relatorios',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -68,6 +74,7 @@ export interface FileRoutesByFullPath {
   '/importar': typeof ImportarRoute
   '/integral': typeof IntegralRoute
   '/login': typeof LoginRoute
+  '/relatorios': typeof RelatoriosRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -78,6 +85,7 @@ export interface FileRoutesByTo {
   '/importar': typeof ImportarRoute
   '/integral': typeof IntegralRoute
   '/login': typeof LoginRoute
+  '/relatorios': typeof RelatoriosRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -89,38 +97,14 @@ export interface FileRoutesById {
   '/importar': typeof ImportarRoute
   '/integral': typeof IntegralRoute
   '/login': typeof LoginRoute
+  '/relatorios': typeof RelatoriosRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/alertas'
-    | '/casco'
-    | '/configuracoes'
-    | '/esteira'
-    | '/importar'
-    | '/integral'
-    | '/login'
+  fullPaths: '/' | '/alertas' | '/casco' | '/configuracoes' | '/esteira' | '/importar' | '/integral' | '/login' | '/relatorios'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/alertas'
-    | '/casco'
-    | '/configuracoes'
-    | '/esteira'
-    | '/importar'
-    | '/integral'
-    | '/login'
-  id:
-    | '__root__'
-    | '/'
-    | '/alertas'
-    | '/casco'
-    | '/configuracoes'
-    | '/esteira'
-    | '/importar'
-    | '/integral'
-    | '/login'
+  to: '/' | '/alertas' | '/casco' | '/configuracoes' | '/esteira' | '/importar' | '/integral' | '/login' | '/relatorios'
+  id: '__root__' | '/' | '/alertas' | '/casco' | '/configuracoes' | '/esteira' | '/importar' | '/integral' | '/login' | '/relatorios'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -132,6 +116,7 @@ export interface RootRouteChildren {
   ImportarRoute: typeof ImportarRoute
   IntegralRoute: typeof IntegralRoute
   LoginRoute: typeof LoginRoute
+  RelatoriosRoute: typeof RelatoriosRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -192,6 +177,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/relatorios': {
+      id: '/relatorios'
+      path: '/relatorios'
+      fullPath: '/relatorios'
+      preLoaderRoute: typeof RelatoriosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -204,6 +196,7 @@ const rootRouteChildren: RootRouteChildren = {
   ImportarRoute: ImportarRoute,
   IntegralRoute: IntegralRoute,
   LoginRoute: LoginRoute,
+  RelatoriosRoute: RelatoriosRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
