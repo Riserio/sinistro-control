@@ -270,9 +270,10 @@ export function AppLayout() {
         <div className="flex items-center gap-2 border-b bg-amber-50 px-4 py-2 text-xs text-amber-900 md:px-6">
           <Info className="h-3.5 w-3.5 shrink-0" />
           <span>
-            Modo demonstração — dados salvos apenas neste navegador. Login, 2º fator e histórico
-            compartilhado serão realmente aplicados com o backend.
+            Dados salvos no banco de dados da BP — compartilhados entre todos os usuários, com
+            login e histórico de alterações por usuário.
           </span>
+
         </div>
 
         <main className="min-w-0 flex-1 p-4 md:p-6">
