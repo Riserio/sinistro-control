@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   CarFront,
   ShieldCheck,
+  Shield,
   Workflow,
   BellRing,
   FileText,
@@ -209,6 +210,18 @@ export function AppLayout() {
         {/* Rodapé: Configurações + Sair */}
         <div className="space-y-1 border-t p-2">
           <Link
+            to="/seguranca"
+            title={colapsada ? "Segurança" : undefined}
+            activeProps={{ className: "bg-primary/10 text-primary font-medium" }}
+            inactiveProps={{ className: "text-muted-foreground hover:bg-muted" }}
+            className={`flex items-center rounded-md py-2 text-sm transition-colors ${
+              colapsada ? "justify-center px-2" : "gap-3 px-3"
+            }`}
+          >
+            <Shield className="h-4 w-4 shrink-0" />
+            {!colapsada && <span>Segurança</span>}
+          </Link>
+          <Link
             to="/configuracoes"
             title={colapsada ? "Configurações" : undefined}
             activeProps={{ className: "bg-primary/10 text-primary font-medium" }}
@@ -240,7 +253,7 @@ export function AppLayout() {
       >
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b bg-card px-4 md:px-6">
           <div className="flex min-w-0 items-center gap-2 overflow-x-auto md:hidden">
-            {[...NAV, { to: "/configuracoes", label: "Configurações" }].map(({ to, label }) => (
+            {[...NAV, { to: "/seguranca", label: "Segurança" }, { to: "/configuracoes", label: "Configurações" }].map(({ to, label }) => (
               <Link
                 key={to}
                 to={to}
