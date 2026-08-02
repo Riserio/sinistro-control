@@ -18,6 +18,7 @@ import { Route as ImportarRouteImport } from './routes/importar'
 import { Route as IntegralRouteImport } from './routes/integral'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as RelatoriosRouteImport } from './routes/relatorios'
+import { Route as SegurancaRouteImport } from './routes/seguranca'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -64,6 +65,11 @@ const RelatoriosRoute = RelatoriosRouteImport.update({
   path: '/relatorios',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SegurancaRoute = SegurancaRouteImport.update({
+  id: '/seguranca',
+  path: '/seguranca',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/integral': typeof IntegralRoute
   '/login': typeof LoginRoute
   '/relatorios': typeof RelatoriosRoute
+  '/seguranca': typeof SegurancaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByTo {
   '/integral': typeof IntegralRoute
   '/login': typeof LoginRoute
   '/relatorios': typeof RelatoriosRoute
+  '/seguranca': typeof SegurancaRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,13 +106,14 @@ export interface FileRoutesById {
   '/integral': typeof IntegralRoute
   '/login': typeof LoginRoute
   '/relatorios': typeof RelatoriosRoute
+  '/seguranca': typeof SegurancaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/alertas' | '/casco' | '/configuracoes' | '/esteira' | '/importar' | '/integral' | '/login' | '/relatorios'
+  fullPaths: '/' | '/alertas' | '/casco' | '/configuracoes' | '/esteira' | '/importar' | '/integral' | '/login' | '/relatorios' | '/seguranca'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/alertas' | '/casco' | '/configuracoes' | '/esteira' | '/importar' | '/integral' | '/login' | '/relatorios'
-  id: '__root__' | '/' | '/alertas' | '/casco' | '/configuracoes' | '/esteira' | '/importar' | '/integral' | '/login' | '/relatorios'
+  to: '/' | '/alertas' | '/casco' | '/configuracoes' | '/esteira' | '/importar' | '/integral' | '/login' | '/relatorios' | '/seguranca'
+  id: '__root__' | '/' | '/alertas' | '/casco' | '/configuracoes' | '/esteira' | '/importar' | '/integral' | '/login' | '/relatorios' | '/seguranca'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -117,6 +126,7 @@ export interface RootRouteChildren {
   IntegralRoute: typeof IntegralRoute
   LoginRoute: typeof LoginRoute
   RelatoriosRoute: typeof RelatoriosRoute
+  SegurancaRoute: typeof SegurancaRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -184,6 +194,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RelatoriosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/seguranca': {
+      id: '/seguranca'
+      path: '/seguranca'
+      fullPath: '/seguranca'
+      preLoaderRoute: typeof SegurancaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -197,6 +214,7 @@ const rootRouteChildren: RootRouteChildren = {
   IntegralRoute: IntegralRoute,
   LoginRoute: LoginRoute,
   RelatoriosRoute: RelatoriosRoute,
+  SegurancaRoute: SegurancaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
